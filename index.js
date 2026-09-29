@@ -148,6 +148,23 @@ async function startBot() {
       await messageHandler(sock, msg);
     }
   });
+
+  // 7. PROTEKSI KEAMANAN: Anti-Call (Otomatis Tolak Panggilan Suara & Video)
+  sock.ev.on('call', async (callEvents) => {
+    for (const call of callEvents) {
+      if (call.status === 'offer') {
+        try {
+          await sock.rejectCall(call.id, call.from);
+          await sock.sendMessage(call.from, {
+            text: `⚠️ *PEMBERITAHUAN KEAMANAN:*\nNomor ini adalah *${config.botName}* dan tidak dapat menerima panggilan suara ataupun video.\n\nSilakan gunakan perintah chat WhatsApp (contoh: *.menu*).`
+          });
+          console.log(`🛡️ [ANTI-CALL] Panggilan dari ${call.from} otomatis ditolak.`);
+        } catch (e) {
+          console.error('Error saat menolak panggilan:', e.message);
+        }
+      }
+    }
+  });
 }
 
 // Menangani Error yang Tidak Tertangkap agar Bot Tidak Mati (Anti-Crash)

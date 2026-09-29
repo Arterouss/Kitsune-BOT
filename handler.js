@@ -88,6 +88,13 @@ export async function messageHandler(sock, msg) {
     body = body.trim();
     if (!body) return;
 
+    // 1. PROTEKSI KEAMANAN: Anti-Virtex & Crash Text
+    // Mengabaikan pesan lebih dari 3000 karakter untuk mencegah lag / bug WhatsApp
+    if (body.length > 3000) {
+      console.log(`🛡️ [ANTI-VIRTEX] Pesan mencurigakan dari ${sender} diblokir (Panjang: ${body.length} karakter).`);
+      return;
+    }
+
     // Cek apakah pesan diawali prefix perintah yang valid
     const prefix = config.prefixes.find((p) => body.startsWith(p));
     if (!prefix) return; // HANYA BALAS JIKA PERINTAH VALID (Anti-Banned)
