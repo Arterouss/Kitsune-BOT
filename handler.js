@@ -42,6 +42,9 @@ await loadPlugins();
 /**
  * Jeda waktu alami (delay)
  */
+// Cache Pesan & Cooldown untuk Anti-Spam & Anti-Duplikasi
+const processedMessageIds = new Set();
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -51,6 +54,17 @@ export async function messageHandler(sock, msg) {
   try {
     if (!msg.message) return;
     if (msg.key && msg.key.remoteJid === 'status@broadcast') return; // Abaikan story
+
+    // Cegah duplikasi pesan (Deduplikasi ID)
+    const msgId = msg.key?.id;
+    if (msgId) {
+      if (processedMessageIds.has(msgId)) return;
+      processedMessageIds.add(msgId);
+      if (processedMessageIds.size > 2000) {
+        const oldest = processedMessageIds.values().next().value;
+        processedMessageIds.delete(oldest);
+      }
+    }
 
     const jid = msg.key.remoteJid;
     const isGroup = jid.endsWith('@g.us');

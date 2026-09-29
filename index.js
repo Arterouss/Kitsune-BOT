@@ -14,10 +14,20 @@ const rl = readline.createInterface({
 });
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
+let currentSock = null;
+
 /**
  * Fungsi Utama Memulai Bot WhatsApp
  */
 async function startBot() {
+  if (currentSock) {
+    try {
+      currentSock.ev.removeAllListeners();
+      currentSock.end(new Error('Reconnecting'));
+    } catch {}
+    currentSock = null;
+  }
+
   console.log('====================================================');
   console.log(`🚀 Menjalankan ${config.botName}...`);
   console.log('====================================================');
@@ -37,6 +47,7 @@ async function startBot() {
     generateHighQualityLinkPreview: true,
     syncFullHistory: false
   });
+  currentSock = sock;
 
   // 3. Login Menggunakan Pairing Code (Jika diaktifkan & belum login)
   if (config.usePairingCode && !sock.authState.creds.registered) {

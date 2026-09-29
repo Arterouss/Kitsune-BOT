@@ -29,5 +29,5 @@ export const config = {
   // true = Gunakan Pairing Code (8 digit kode angka/huruf tanpa kamera)
   // false = Gunakan Scan QR Code di Terminal
   usePairingCode: true,
-  phoneNumber: '' // Jika diisi (contoh: '6281234567890'), bot langsung meminta pairing code ke nomor ini
+  phoneNumber: '6288976563675' // Nomor WhatsApp Business bot (format 628xxx)
 };

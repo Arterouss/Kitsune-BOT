@@ -1,5 +1,5 @@
 // plugins/sticker.js - Plugin Pembuat Stiker & Watermark
-import { imageToSticker, videoToSticker, addExif } from '../lib/sticker.js';
+import { createSticker } from '../lib/sticker.js';
 import { config } from '../config.js';
 import { downloadContentFromMessage } from '@whiskeysockets/baileys';
 
@@ -18,7 +18,7 @@ export default {
   category: 'sticker',
   description: 'Konversi foto/video ke stiker WebP dan ganti watermark',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
-    // 1. Buat Stiker Baru
+    // 1. Buat Stiker Baru (.s / .sticker)
     if (['s', 'sticker', 'stiker'].includes(command)) {
       const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       let mediaMsg = null;
@@ -51,13 +51,7 @@ export default {
         const packname = config.sticker.packname;
         const author = config.sticker.author;
 
-        let stickerBuffer;
-        if (isVideo) {
-          stickerBuffer = await videoToSticker(buffer, packname, author);
-        } else {
-          stickerBuffer = await imageToSticker(buffer, packname, author);
-        }
-
+        const stickerBuffer = await createSticker(buffer, packname, author);
         await sock.sendMessage(jid, { sticker: stickerBuffer }, { quoted: msg });
       } catch (err) {
         console.error('Gagal convert stiker:', err);
@@ -66,7 +60,7 @@ export default {
       return;
     }
 
-    // 2. Ganti Watermark Stiker
+    // 2. Ganti Watermark Stiker (.wm / .take)
     if (['wm', 'take'].includes(command)) {
       const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       if (!quoted?.stickerMessage) {
@@ -81,7 +75,7 @@ export default {
 
       try {
         const buffer = await downloadMedia(quoted.stickerMessage, 'sticker');
-        const newSticker = await addExif(buffer, packname, author);
+        const newSticker = await createSticker(buffer, packname, author);
         await sock.sendMessage(jid, { sticker: newSticker }, { quoted: msg });
       } catch (err) {
         console.error('Gagal mengubah watermark:', err);
