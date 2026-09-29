@@ -61,7 +61,7 @@ Perintah `.halo` langsung aktif otomatis tanpa perlu restart bot!
 
 ---
 
-## ⚡ Cara Menjalankan Bot
+## ⚡ Cara Menjalankan Bot di Laptop (Lokal)
 
 1. Buka Terminal / PowerShell di folder ini (`d:\Kuliah\Web\BotWa`).
 2. Jalankan perintah:
@@ -71,3 +71,12 @@ Perintah `.halo` langsung aktif otomatis tanpa perlu restart bot!
 3. Masukkan nomor WhatsApp Anda (format: `628xxxxxxxxxx`).
 4. Salin 8 digit **Kode Pairing** yang muncul di terminal (contoh: `ABCD-1234`).
 5. Buka WhatsApp di HP > **Perangkat Tertaut** > **Tautkan Perangkat** > pilih **"Tautkan dengan nomor telepon saja"**, lalu masukkan kodenya.
+
+---
+
+## ☁️ Deployment Cloud Gratis 24/7 (Koyeb)
+
+Ingin bot menyala 24 jam nonstop tanpa perlu laptop dinyalakan? Klik tombol di bawah untuk deploy langsung ke **Koyeb** secara gratis:
+
+[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=github.com/Arterouss/Kitsune-BOT&branch=main&name=kitsune-bot)
+
