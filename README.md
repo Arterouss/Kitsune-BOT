@@ -74,9 +74,25 @@ Perintah `.halo` langsung aktif otomatis tanpa perlu restart bot!
 
 ---
 
-## ☁️ Deployment Cloud Gratis 24/7 (Koyeb)
+## ☁️ Deployment Cloud Gratis 24/7
 
-Ingin bot menyala 24 jam nonstop tanpa perlu laptop dinyalakan? Klik tombol di bawah untuk deploy langsung ke **Koyeb** secara gratis:
+### 1. Deploy ke Render (Gratis & Direkomendasikan)
+Klik tombol di bawah untuk deploy langsung ke **Render** secara gratis:
 
-[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=github.com/Arterouss/Kitsune-BOT&branch=main&name=kitsune-bot)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Arterouss/Kitsune-BOT)
+
+---
+
+### 2. Deploy di HP Android (Termux — 100% Gratis Tanpa Laptop)
+1. Buka aplikasi **Termux** di HP Android Anda.
+2. Jalankan perintah:
+   ```bash
+   pkg update && pkg install git nodejs-lts ffmpeg -y
+   git clone https://github.com/Arterouss/Kitsune-BOT.git
+   cd Kitsune-BOT
+   npm install
+   npm start
+   ```
+3. Masukkan kode pairing yang muncul ke WhatsApp Anda. Selesai!
+
 
