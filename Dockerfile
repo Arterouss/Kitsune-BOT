@@ -1,26 +1,27 @@
 FROM node:20-bullseye-slim
 
-# Install dependency sistem: ffmpeg, python3, curl, git, yt-dlp
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies: ffmpeg, python3, curl, git, yt-dlp
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
-    python3-pip \
     curl \
     git \
     ca-certificates && \
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy dependency files
+# Copy package files
 COPY package*.json ./
-RUN npm install --production
+RUN npm install --omit=dev --legacy-peer-deps
 
-# Copy semua source code
+# Copy app source
 COPY . .
 
 EXPOSE 8080
