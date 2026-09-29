@@ -7,6 +7,8 @@ import qrcode from 'qrcode-terminal';
 import { config } from './config.js';
 import { messageHandler } from './handler.js';
 
+import http from 'http';
+
 // Setup Interface Input Terminal
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,6 +17,29 @@ const rl = readline.createInterface({
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 let currentSock = null;
+
+// Server Health Check untuk Cloud Hosting (Koyeb / Render / Railway)
+const PORT = process.env.PORT || 8080;
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Kitsune Bot</title></head>
+      <body style="font-family: -apple-system, sans-serif; text-align: center; padding: 60px; background: #0f172a; color: #f8fafc;">
+        <h1 style="font-size: 3rem; margin-bottom: 10px;">🦊 Kitsune Bot</h1>
+        <p style="font-size: 1.2rem; color: #94a3b8;">WhatsApp Multi-Device Bot created by <strong>Arterouss</strong></p>
+        <div style="display: inline-block; padding: 10px 20px; background: #22c55e; color: #000; font-weight: bold; border-radius: 999px; margin-top: 20px;">
+          🟢 BOT IS ACTIVE & HEALTHY
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 Server Web Health Check aktif di port ${PORT}`);
+});
 
 /**
  * Fungsi Utama Memulai Bot WhatsApp
