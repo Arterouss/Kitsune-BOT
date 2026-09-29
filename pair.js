@@ -8,15 +8,9 @@ import { config } from './config.js';
 
 const sessionDir = path.resolve('./session');
 
-// Backup & Bersihkan folder session lama agar WhatsApp memberikan kode pairing baru
+// Bersihkan folder session lama agar WhatsApp memberikan kode pairing baru
 if (fs.existsSync(sessionDir)) {
-  const backupDir = path.resolve('./session_backup_' + Date.now());
-  try {
-    fs.renameSync(sessionDir, backupDir);
-    console.log(`📁 Sesi lama diamankan ke: ${path.basename(backupDir)}`);
-  } catch (e) {
-    fs.rmSync(sessionDir, { recursive: true, force: true });
-  }
+  fs.rmSync(sessionDir, { recursive: true, force: true });
 }
 fs.mkdirSync(sessionDir, { recursive: true });
 

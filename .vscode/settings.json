@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "session/": true,
+    "package-lock.json": false
+  }
+}
