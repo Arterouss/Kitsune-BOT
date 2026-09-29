@@ -25,10 +25,10 @@ export default {
       media: '🎵 MUSIK & MEDIA DOWNLOADER',
       sticker: '🎨 PEMBUAT STIKER',
       ai: '🤖 AI & ENSIKLOPEDIA',
-      anime: '🌸 ANIME & MANGA INFO',
+      anime: '🌸 ANIME, MANGA & WALLPAPER AESTHETIC',
       akademik: '🎓 AKADEMIK & TUGAS',
       group: '👥 PENGELOLA GRUP',
-      tools: '⚙️ UTILITAS & ALAT',
+      tools: '⚙️ UTILITAS & ALAT KONVERSI',
       main: '📋 UTAMA'
     };
 

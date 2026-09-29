@@ -8,6 +8,26 @@ import { config } from './config.js';
 import { messageHandler } from './handler.js';
 
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+
+// Pulihkan sesi WhatsApp dari Environment Variable jika tersedia di Cloud (Render)
+if (process.env.SESSION_DATA) {
+  try {
+    const sessionDir = path.resolve('./session');
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    }
+    const credsPath = path.join(sessionDir, 'creds.json');
+    if (!fs.existsSync(credsPath)) {
+      const decoded = Buffer.from(process.env.SESSION_DATA, 'base64').toString('utf-8');
+      fs.writeFileSync(credsPath, decoded);
+      console.log('🔑 [SESSION RESTORED] Berhasil memulihkan sesi login WhatsApp dari Environment Variable!');
+    }
+  } catch (err) {
+    console.error('Error saat memulihkan session dari SESSION_DATA:', err.message);
+  }
+}
 
 // Setup Interface Input Terminal
 const rl = readline.createInterface({
