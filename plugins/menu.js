@@ -27,6 +27,7 @@ export default {
       ai: '🤖 AI & ENSIKLOPEDIA',
       anime: '🌸 ANIME & MANGA INFO',
       akademik: '🎓 AKADEMIK & TUGAS',
+      group: '👥 PENGELOLA GRUP',
       tools: '⚙️ UTILITAS & ALAT',
       main: '📋 UTAMA'
     };
