@@ -68,6 +68,8 @@ export default {
         console.error('Error Sholat:', err);
         return reply('❌ Terjadi kesalahan saat mengambil jadwal sholat.');
       }
+    }
+
     // 3. INFO GEMPA BMKG
     if (command === 'gempa') {
       await reply('⏳ Mengambil data gempa terbaru dari BMKG...');

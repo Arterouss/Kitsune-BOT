@@ -15,28 +15,62 @@ export default {
         return reply(`⚠️ Masukkan kata kunci!\nContoh: *${prefix}${command} anime aesthetic*`);
       }
 
-      await reply(`🔍 Mencari gambar *"${args}"* di Pinterest...`);
+      await reply(`🔍 Mencari gambar *"${args}"*...`);
 
       try {
-        // Menggunakan public API gratis
-        const res = await axios.get(`https://api.vreden.web.id/api/pinterest?query=${encodeURIComponent(args)}`);
-        
-        if (!res.data.result || res.data.result.length === 0) {
-          return reply('❌ Tidak menemukan gambar yang cocok.');
+        let imageUrls = [];
+
+        // Strategi 1: Siputzx Pinterest API
+        try {
+          const res = await axios.get(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}`, {
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          if (res.data?.status && Array.isArray(res.data.data) && res.data.data.length > 0) {
+            imageUrls = res.data.data.map(item => item.image_url || item.pin).filter(Boolean);
+          }
+        } catch {}
+
+        // Strategi 2: Coba cari dengan query wallpaper/aesthetic jika hasil kosong
+        if (imageUrls.length === 0) {
+          try {
+            const res = await axios.get(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args + ' aesthetic wallpaper')}`, {
+              timeout: 8000,
+              headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            if (res.data?.status && Array.isArray(res.data.data) && res.data.data.length > 0) {
+              imageUrls = res.data.data.map(item => item.image_url).filter(Boolean);
+            }
+          } catch {}
         }
 
-        // Ambil hasil acak dari beberapa gambar pertama
-        const results = res.data.result;
-        const randomImg = results[Math.floor(Math.random() * Math.min(10, results.length))];
+        // Strategi 3: Unsplash HD fallback jika Pinterest limit/kosong
+        if (imageUrls.length === 0) {
+          try {
+            const res = await axios.get(`https://unsplash.com/napi/search/photos?query=${encodeURIComponent(args)}&per_page=15`, {
+              timeout: 8000,
+              headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            if (Array.isArray(res.data?.results) && res.data.results.length > 0) {
+              imageUrls = res.data.results.map(item => item.urls?.regular || item.urls?.full).filter(Boolean);
+            }
+          } catch {}
+        }
+
+        if (imageUrls.length === 0) {
+          return reply(`❌ Tidak menemukan gambar yang cocok untuk "${args}". Coba kata kunci lain.`);
+        }
+
+        const randomImg = imageUrls[Math.floor(Math.random() * Math.min(10, imageUrls.length))];
 
         return await sock.sendMessage(jid, { 
           image: { url: randomImg },
-          caption: `📌 *Pinterest Search*\nKata kunci: ${args}`
+          caption: `📌 *Pencarian Gambar*\nKata kunci: ${args}`
         }, { quoted: msg });
         
       } catch (err) {
         console.error('Error Pinterest:', err);
-        return reply('❌ Gagal mengambil gambar dari Pinterest. API mungkin sedang limit.');
+        return reply('❌ Gagal mengambil gambar dari Pinterest. Silakan coba beberapa saat lagi.');
       }
     }
 
@@ -49,14 +83,16 @@ export default {
       await reply(`🔍 Mencari *"${args}"* di YouTube...`);
 
       try {
-        // Menggunakan yt-dlp agar tidak kena blokir
         const ytArgs = [
+          '--js-runtimes', 'node',
+          '--remote-components', 'ejs:github',
+          '--extractor-args', 'youtube:player_client=android',
           '--print', '%(title)s|%(webpage_url)s|%(duration_string)s|%(view_count)s',
           '--no-playlist',
           `ytsearch5:${args}`
         ];
 
-        const meta = await new Promise((resolve, reject) => {
+        const meta = await new Promise((resolve) => {
           const proc = spawn('yt-dlp', ytArgs, { windowsHide: true });
           let stdout = '';
           proc.stdout.on('data', (d) => { stdout += d.toString(); });
