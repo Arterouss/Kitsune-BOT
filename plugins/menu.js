@@ -28,7 +28,9 @@ export default {
       anime: '🌸 ANIME, MANGA & WALLPAPER AESTHETIC',
       akademik: '🎓 AKADEMIK & TUGAS',
       group: '👥 PENGELOLA GRUP',
-      tools: '⚙️ UTILITAS & ALAT KONVERSI',
+      tools: '⚙️ ALAT KONVERSI',
+      utility: '📅 UTILITAS HARIAN',
+      hiburan: '🎮 HIBURAN & GAME',
       main: '📋 UTAMA'
     };
 

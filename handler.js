@@ -97,7 +97,22 @@ export async function messageHandler(sock, msg) {
 
     // Cek apakah pesan diawali prefix perintah yang valid
     const prefix = config.prefixes.find((p) => body.startsWith(p));
-    if (!prefix) return; // HANYA BALAS JIKA PERINTAH VALID (Anti-Banned)
+    
+    // --- CEK JAWABAN GAME ---
+    if (!prefix) {
+      if (global.gameSessions && global.gameSessions[jid]) {
+        const session = global.gameSessions[jid];
+        // Jika jawaban benar
+        if (body.toLowerCase() === session.jawaban.toLowerCase()) {
+          clearTimeout(session.waktu);
+          delete global.gameSessions[jid];
+          await sock.sendMessage(jid, { 
+            text: `🎉 *BENAR!*\n\nJawaban: *${session.jawaban}*\nSelamat ${senderName}! 👏${session.deskripsi ? `\n_Alasan: ${session.deskripsi}_` : ''}` 
+          }, { quoted: msg });
+        }
+      }
+      return; // HANYA BALAS JIKA PERINTAH VALID (Anti-Banned)
+    }
 
     const command = body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
     const args = body.slice(prefix.length + command.length).trim();
