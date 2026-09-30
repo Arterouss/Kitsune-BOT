@@ -28,21 +28,28 @@ function calculateMath(expr) {
 
 export default {
   name: 'media_tools',
-  command: ['toimg', 'tts', 'tr', 'translate', 'calc', 'kalkulator', 'short', 'shortlink'],
+  command: ['toimg', 'getimage', 'toimage', 'jadiimage', 'img', 'tts', 'tr', 'translate', 'calc', 'kalkulator', 'short', 'shortlink'],
   category: 'tools',
-  description: 'Alat media: stiker ke gambar, TTS Google (VN), terjemahan AI, kalkulator, & shortlink',
+  description: 'Alat media: stiker ke gambar (.toimg / .getimage), TTS Google (VN), terjemahan AI, kalkulator, & shortlink',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
-    // 1. STIKER KE GAMBAR (.toimg)
-    if (command === 'toimg') {
-      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-      if (!quoted?.stickerMessage) {
+    // 1. STIKER KE GAMBAR (.toimg / .getimage / .toimage)
+    if (['toimg', 'getimage', 'toimage', 'jadiimage', 'img'].includes(command)) {
+      const contextInfo = msg.message?.extendedTextMessage?.contextInfo
+        || msg.message?.imageMessage?.contextInfo
+        || msg.message?.videoMessage?.contextInfo
+        || msg.message?.stickerMessage?.contextInfo;
+
+      const quoted = contextInfo?.quotedMessage;
+      const stickerMsg = quoted?.stickerMessage || msg.message?.stickerMessage;
+
+      if (!stickerMsg) {
         return reply(`⚠️ Balas (quote) stiker yang ingin diubah menjadi gambar dengan mengetik *${prefix}${command}*`);
       }
 
       await reply('⏳ Mengonversi stiker ke gambar...');
 
       try {
-        const buffer = await downloadMedia(quoted.stickerMessage, 'sticker');
+        const buffer = await downloadMedia(stickerMsg, 'sticker');
         const imgBuffer = await stickerToImage(buffer);
 
         return await sock.sendMessage(jid, {
@@ -51,7 +58,7 @@ export default {
         }, { quoted: msg });
       } catch (err) {
         console.error('Error toimg:', err);
-        return reply('❌ Gagal mengubah stiker menjadi gambar.');
+        return reply(`❌ Gagal mengubah stiker: ${err.message || 'Format tidak didukung'}`);
       }
     }
 

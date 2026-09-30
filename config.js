@@ -25,6 +25,17 @@ export const config = {
     maxAudioDurationSec: 600   // Maksimal durasi lagu (10 menit)
   },
 
+  // Konfigurasi AI (Gratis, tanpa kartu kredit)
+  ai: {
+    // Kunci API Groq (Disarankan: 14.400 request/hari, super cepat)
+    // Ambil gratis di: https://console.groq.com/keys
+    groqApiKey: process.env.GROQ_API_KEY || '',
+
+    // Kunci API Google Gemini (Opsional: 1.500 request/hari)
+    // Ambil gratis di: https://aistudio.google.com/app/apikey
+    geminiApiKey: process.env.GEMINI_API_KEY || ''
+  },
+
   // Pilihan Login:
   // true = Gunakan Pairing Code (8 digit kode angka/huruf tanpa kamera)
   // false = Gunakan Scan QR Code di Terminal
