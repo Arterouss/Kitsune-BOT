@@ -5,7 +5,7 @@ export default {
   name: 'utility',
   command: ['cuaca', 'sholat', 'jadwalsholat', 'gempa'],
   category: 'utility',
-  description: 'Cek cuaca dan jadwal sholat',
+  description: 'Cek cuaca kota, jadwal sholat harian, dan info gempa BMKG terkini',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
     // 1. INFO CUACA
     if (command === 'cuaca') {

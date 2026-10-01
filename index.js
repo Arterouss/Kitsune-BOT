@@ -29,6 +29,23 @@ if (process.env.SESSION_DATA) {
   }
 }
 
+// Pulihkan YouTube Cookies dari Environment Variable jika tersedia di Cloud (Render)
+if (process.env.YOUTUBE_COOKIES || process.env.COOKIES_DATA) {
+  try {
+    const raw = process.env.YOUTUBE_COOKIES || process.env.COOKIES_DATA;
+    const cookiesPath = path.resolve('./cookies.txt');
+    if (!fs.existsSync(cookiesPath)) {
+      const decoded = raw.startsWith('#')
+        ? raw
+        : Buffer.from(raw, 'base64').toString('utf-8');
+      fs.writeFileSync(cookiesPath, decoded);
+      console.log('🍪 [COOKIES RESTORED] Berhasil memulihkan cookies YouTube dari Environment Variable!');
+    }
+  } catch (err) {
+    console.error('Error saat memulihkan cookies YouTube:', err.message);
+  }
+}
+
 // Setup Interface Input Terminal
 const rl = readline.createInterface({
   input: process.stdin,

@@ -18,11 +18,12 @@ export default {
       try {
         const song = await downloadSong(args);
 
+        const viewsText = (!song.views || isNaN(Number(song.views))) ? '' : `\n👀 *Dilihat:* ${Number(song.views).toLocaleString('id-ID')} kali`;
         const caption = `
 🎵 *${song.title}*
 🎤 *Artis:* ${song.artist}
-⏱️ *Durasi:* ${song.duration}
-👀 *Dilihat:* ${Number(song.views).toLocaleString('id-ID')} kali
+⏱️ *Durasi:* ${song.duration}${viewsText}
+📡 *Sumber:* ${song.source || 'Online Media'}
 `.trim();
 
         if (song.thumbnail) {
