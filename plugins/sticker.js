@@ -22,32 +22,45 @@ export default {
     if (['s', 'sticker', 'stiker'].includes(command)) {
       const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       let mediaMsg = null;
+      let mediaType = 'image';
       let isVideo = false;
 
       if (msg.message?.imageMessage) {
         mediaMsg = msg.message.imageMessage;
+        mediaType = 'image';
       } else if (msg.message?.videoMessage) {
         mediaMsg = msg.message.videoMessage;
+        mediaType = 'video';
         isVideo = true;
+      } else if (msg.message?.documentMessage && (msg.message.documentMessage.mimetype?.includes('image') || msg.message.documentMessage.mimetype?.includes('video'))) {
+        mediaMsg = msg.message.documentMessage;
+        mediaType = 'document';
+        isVideo = mediaMsg.mimetype?.includes('video') || mediaMsg.mimetype?.includes('gif');
       } else if (quoted?.imageMessage) {
         mediaMsg = quoted.imageMessage;
+        mediaType = 'image';
       } else if (quoted?.videoMessage) {
         mediaMsg = quoted.videoMessage;
+        mediaType = 'video';
         isVideo = true;
+      } else if (quoted?.documentMessage && (quoted.documentMessage.mimetype?.includes('image') || quoted.documentMessage.mimetype?.includes('video'))) {
+        mediaMsg = quoted.documentMessage;
+        mediaType = 'document';
+        isVideo = mediaMsg.mimetype?.includes('video') || mediaMsg.mimetype?.includes('gif');
       }
 
       if (!mediaMsg) {
-        return reply(`⚠️ Kirim gambar/video dengan caption *${prefix}${command}* atau balas (quote) media dengan *${prefix}${command}*`);
+        return reply(`⚠️ Kirim gambar/video/GIF dengan caption *${prefix}${command}* atau balas (quote) media dengan *${prefix}${command}*`);
       }
 
       if (isVideo && mediaMsg.seconds > 10) {
-        return reply('⚠️ Durasi video maksimal 10 detik untuk dijadikan stiker!');
+        return reply('⚠️ Durasi video/GIF maksimal 10 detik untuk dijadikan stiker!');
       }
 
-      await reply('⏳ Sedang membuat stiker, mohon tunggu sebentar...');
+      await reply('⏳ Sedang memproses dan mengompres stiker animasi...');
 
       try {
-        const buffer = await downloadMedia(mediaMsg, isVideo ? 'video' : 'image');
+        const buffer = await downloadMedia(mediaMsg, mediaType);
         const packname = config.sticker.packname;
         const author = config.sticker.author;
 
