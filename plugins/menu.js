@@ -65,6 +65,22 @@ export default {
         ]
       },
       {
+        category: '⚔️ RPG & PETUALANGAN',
+        items: [
+          { cmd: 'adventure / adv', param: '', desc: 'Jelajahi hutan dungeon, lawan monster & dapatkan EXP' },
+          { cmd: 'mining / nambang', param: '', desc: 'Tambang batu, besi, emas & kristal berharga' },
+          { cmd: 'profile / status', param: '', desc: 'Lihat status level, HP, stamina, koin & perlengkapan' },
+          { cmd: 'inv / tas', param: '', desc: 'Buka tas penyimpanan material & ramuan' },
+          { cmd: 'heal', param: '', desc: 'Gunakan ramuan untuk memulihkan darah (HP)' },
+          { cmd: 'daily / klaim', param: '', desc: 'Ambil jatah koin harian & ramuan gratis tiap 24 jam' },
+          { cmd: 'shop / toko', param: '', desc: 'Beli ramuan, beliung, & perlengkapan baru' },
+          { cmd: 'jual', param: '<nama/all>', desc: 'Jual hasil tambang & kayu jadi koin emas' },
+          { cmd: 'craft', param: '<resep>', desc: 'Tempa pedang & zirah tempur lebih kuat' },
+          { cmd: 'top / leaderboard', param: '', desc: 'Peringkat 10 petualang terkuat di bot' },
+          { cmd: 'transfer', param: '@tag <koin>', desc: 'Kirim koin emas ke rekan petualang lain' }
+        ]
+      },
+      {
         category: '🎮 GAME & HIBURAN',
         items: [
           { cmd: 'susunkata', param: '', desc: 'Game tebak dan susun huruf acak' },
