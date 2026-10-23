@@ -9,7 +9,10 @@ import {
   MATERIAL_PRICES,
   CRAFT_RECIPES,
   MONSTERS,
-  RAID_BOSSES
+  RAID_BOSSES,
+  addToArmory,
+  equipFromArmory,
+  sellFromArmory
 } from '../lib/rpg.js';
 
 // Global memory state for active group duels & boss raids
@@ -35,6 +38,9 @@ export default {
   command: [
     'profile', 'status', 'me',
     'inv', 'inventory', 'tas',
+    'armory', 'lemari', 'koleksi',
+    'equip', 'pasang',
+    'jualeq', 'selleq',
     'adventure', 'petualang', 'adv',
     'mining', 'nambang', 'mine',
     'heal', 'obat',
@@ -124,6 +130,94 @@ export default {
 `.trim();
 
       return reply(text);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2B. LEMARI KOLEKSI SENJATA & ZIRAH (.armory / .lemari / .koleksi)
+    // ──────────────────────────────────────────────────────────
+    if (['armory', 'lemari', 'koleksi'].includes(command)) {
+      const armory = user.armory || [];
+      if (armory.length === 0) {
+        return reply(`🚪 Lemari senjatamu masih kosong!\nBeli perlengkapan di *${prefix}shop* atau buat di *${prefix}craft*.`);
+      }
+
+      const weapons = armory.filter(i => i.type === 'weapon');
+      const armors = armory.filter(i => i.type === 'armor');
+      const pickaxes = armory.filter(i => i.type === 'pickaxe');
+
+      const weaponsList = weapons.map((w, i) => {
+        const isEquipped = user.equipment.weaponId === w.id || user.equipment.weapon === w.name ? ' ✅ *[DIPAKAI]*' : '';
+        return `  ${i + 1}. \`${w.id}\` - ${w.name} (+${w.stat} ATK)${isEquipped}`;
+      }).join('\n') || '  _(Kosong)_';
+
+      const armorsList = armors.map((a, i) => {
+        const isEquipped = user.equipment.armorId === a.id || user.equipment.armor === a.name ? ' ✅ *[DIPAKAI]*' : '';
+        return `  ${i + 1}. \`${a.id}\` - ${a.name} (+${a.stat} DEF)${isEquipped}`;
+      }).join('\n') || '  _(Kosong)_';
+
+      const pickaxesList = pickaxes.map((p, i) => {
+        const isEquipped = user.equipment.pickaxeId === p.id || user.equipment.pickaxe === p.name ? ' ✅ *[DIPAKAI]*' : '';
+        return `  ${i + 1}. \`${p.id}\` - ${p.name} (Tier ${p.tier || 1})${isEquipped}`;
+      }).join('\n') || '  _(Kosong)_';
+
+      const text = `
+╭━━━━━「 🚪 *LEMARI PERLENGKAPAN* 」━━━━━╮
+┃ 👤 *Pemilik:* ${user.name} (Lv. ${user.level})
+┃ 💰 *Koin:* ${formatNumber(user.money)} Gold
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+🗡️ *Koleksi Senjata:*
+${weaponsList}
+
+🛡️ *Koleksi Zirah:*
+${armorsList}
+
+⛏️ *Koleksi Beliung:*
+${pickaxesList}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *Pasang:* \`${prefix}equip <id>\` (Contoh: \`${prefix}equip pedang_iron\`)
+💡 *Jual Bekas:* \`${prefix}jualeq <id>\` (Dapat refund 50% koin)
+`.trim();
+
+      return reply(text);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2C. MEMASANG PERLENGKAPAN DARI LEMARI (.equip / .pasang)
+    // ──────────────────────────────────────────────────────────
+    if (['equip', 'pasang'].includes(command)) {
+      if (!args) {
+        return reply(`⚠️ Masukkan ID perlengkapan yang ingin dipasang!\nContoh: *${prefix}equip pedang_iron*\nKetik *${prefix}lemari* untuk melihat koleksi lemarimu.`);
+      }
+
+      const res = equipFromArmory(user, args);
+      if (!res.success) {
+        return reply(`❌ ${res.msg}`);
+      }
+
+      saveRpgDb();
+      return reply(`✅ *PERLENGKAPAN BERHASIL DIPASANG!*\n${res.item.name} kini menjadi *${res.slot} Aktif* karaktermu!\nCek status barumu di *${prefix}profile*.`);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2D. MENJUAL PERLENGKAPAN BEKAS (.jualeq / .selleq)
+    // ──────────────────────────────────────────────────────────
+    if (['jualeq', 'selleq'].includes(command)) {
+      if (!args) {
+        return reply(`⚠️ Masukkan ID perlengkapan bekas yang ingin dijual!\nContoh: *${prefix}jualeq pedang_kayu*\nKetik *${prefix}lemari* untuk melihat isi lemarimu.`);
+      }
+
+      const res = sellFromArmory(user, args);
+      if (!res.success) {
+        return reply(`❌ ${res.msg}`);
+      }
+
+      saveRpgDb();
+      return reply(`💰 *PERLENGKAPAN TERJUAL!*
+Kamu telah menjual *${res.item.name}* ke toko loak!
+💵 Uang refund didapat: *+${formatNumber(res.refund)} Gold*
+Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
     }
 
     // ──────────────────────────────────────────────────────────
@@ -363,21 +457,31 @@ Terima kasih sudah setia berpetualang bersama Kitsune Bot!
     // 7. TOKO BARANG (.shop / .toko)
     // ──────────────────────────────────────────────────────────
     if (['shop', 'toko'].includes(command)) {
-      let listShop = SHOP_ITEMS.map((item, idx) => {
-        return `*${idx + 1}. ${item.name}*\n   💰 Harga: *${formatNumber(item.price)} Gold*\n   📝 _${item.desc}_\n   🛒 Beli: \`${prefix}beli ${item.id} 1\``;
-      }).join('\n\n');
+      const consumables = SHOP_ITEMS.filter(i => i.type === 'consumable');
+      const weapons = SHOP_ITEMS.filter(i => i.type === 'weapon');
+      const armors = SHOP_ITEMS.filter(i => i.type === 'armor');
+      const pickaxes = SHOP_ITEMS.filter(i => i.type === 'pickaxe');
 
       const text = `
 ╭━━━━━「 🛒 *TOKO PETUALANG KITSUNE* 」━━━━━╮
 ┃ 👤 *Koin Kamu:* ${formatNumber(user.money)} Gold
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-${listShop}
+🧪 *RAMUAN & KONSUMSI:*
+${consumables.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
+
+🗡️ *SENJATA (PEDANG TIER 1 - 5):*
+${weapons.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
+
+🛡️ *ZIRAH (PELINDUNG TIER 1 - 5):*
+${armors.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
+
+⛏️ *BELIUNG TAMBANG TIER 2 - 5:*
+${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *Cara Pembelian:*
-Ketik: *${prefix}beli <nama_item> <jumlah>*
-Contoh: *${prefix}beli potion_hp 2*
+💡 *Beli:* \`${prefix}beli <id> <jumlah>\` (Contoh: \`${prefix}beli pedang_iron\`)
+💡 *Cek Lemari:* \`${prefix}lemari\` | *Ganti:* \`${prefix}equip <id>\` | *Jual:* \`${prefix}jualeq <id>\`
 `.trim();
 
       return reply(text);
@@ -388,7 +492,7 @@ Contoh: *${prefix}beli potion_hp 2*
     // ──────────────────────────────────────────────────────────
     if (['buy', 'beli'].includes(command)) {
       if (!args) {
-        return reply(`⚠️ Masukkan item yang ingin dibeli!\nContoh: *${prefix}beli potion_hp 2*\nKetik *${prefix}shop* untuk melihat daftar item.`);
+        return reply(`⚠️ Masukkan ID item yang ingin dibeli!\nContoh: *${prefix}beli pedang_bronze* atau *${prefix}beli potion_hp 2*\nKetik *${prefix}shop* untuk melihat katalog barang.`);
       }
 
       const parts = args.split(' ');
@@ -406,28 +510,44 @@ Contoh: *${prefix}beli potion_hp 2*
         return reply(`❌ Item tidak ditemukan! Ketik *${prefix}shop* untuk melihat barang yang dijual.`);
       }
 
-      const totalPrice = targetItem.price * count;
-      if (user.money < totalPrice) {
-        return reply(`💸 Koin kamu tidak cukup!\nTotal harga: *${formatNumber(totalPrice)} Gold*\nKoin kamu: *${formatNumber(user.money)} Gold* (Kurang ${formatNumber(totalPrice - user.money)}).`);
+      // Pembelian Ramuan / Konsumsi
+      if (targetItem.type === 'consumable') {
+        const totalPrice = targetItem.price * count;
+        if (user.money < totalPrice) {
+          return reply(`💸 Koin tidak cukup!\nTotal: *${formatNumber(totalPrice)} Gold* (Koinmu: ${formatNumber(user.money)}).`);
+        }
+
+        user.money -= totalPrice;
+        if (targetItem.id === 'potion_hp') {
+          user.inventory.potion_hp = (user.inventory.potion_hp || 0) + count;
+        } else if (targetItem.id === 'potion_stamina') {
+          user.inventory.potion_stamina = (user.inventory.potion_stamina || 0) + count;
+        }
+
+        saveRpgDb();
+        return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.`);
       }
 
-      // Proses pembelian
-      user.money -= totalPrice;
-
-      if (targetItem.id === 'potion_hp') {
-        user.inventory.potion_hp = (user.inventory.potion_hp || 0) + count;
-      } else if (targetItem.id === 'potion_stamina') {
-        user.inventory.potion_stamina = (user.inventory.potion_stamina || 0) + count;
-      } else if (targetItem.id === 'beliung_besi') {
-        user.equipment.pickaxe = '⛏️ Beliung Besi Kuat';
-        user.equipment.pickaxeTier = 2;
-      } else if (targetItem.id === 'pedang_batu') {
-        user.equipment.weapon = '🗡️ Pedang Batu Tajam';
-        user.equipment.weaponAtk = 12;
+      // Pembelian Perlengkapan (Senjata / Zirah / Beliung)
+      if (user.armory?.some(a => a.id === targetItem.id)) {
+        return reply(`⚠️ Kamu sudah memiliki *${targetItem.name}* di lemarimu!\nKetik *${prefix}lemari* untuk melihat koleksimu atau *${prefix}equip ${targetItem.id}* untuk memasangnya.`);
       }
 
+      if (user.money < targetItem.price) {
+        return reply(`💸 Koin kamu tidak cukup!\nHarga *${targetItem.name}*: *${formatNumber(targetItem.price)} Gold*\nKoin kamu: *${formatNumber(user.money)} Gold* (Kurang ${formatNumber(targetItem.price - user.money)}).`);
+      }
+
+      user.money -= targetItem.price;
+      addToArmory(user, targetItem);
+      equipFromArmory(user, targetItem.id);
       saveRpgDb();
-      return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.`);
+
+      return reply(`
+🎉 *PEMBELIAN PERLENGKAPAN BERHASIL!*
+Kamu telah membeli *${targetItem.name}* seharga *${formatNumber(targetItem.price)} Gold*!
+✨ Perlengkapan telah disimpan di lemarimu dan langsung terpasang!
+Cek statusmu di *${prefix}profile* atau kelola lemari di *${prefix}lemari*.
+`.trim());
     }
 
     // ──────────────────────────────────────────────────────────
@@ -561,17 +681,17 @@ Contoh: *${prefix}craft pedang_besi*
         user.inventory[mat] -= needed;
       }
 
-      // Pasang equipment baru
-      if (recipe.type === 'weapon') {
-        user.equipment.weapon = recipe.name;
-        user.equipment.weaponAtk = recipe.bonusAtk;
-      } else if (recipe.type === 'armor') {
-        user.equipment.armor = recipe.name;
-        user.equipment.armorDef = recipe.bonusDef;
-      } else if (recipe.type === 'pickaxe') {
-        user.equipment.pickaxe = recipe.name;
-        user.equipment.pickaxeTier = recipe.tier;
-      }
+      // Simpan ke lemari dan pasang equipment baru
+      const craftedItem = {
+        id: recipe.id,
+        name: recipe.name,
+        type: recipe.type,
+        stat: recipe.bonusAtk || recipe.bonusDef || 0,
+        tier: recipe.tier || 1,
+        price: (recipe.cost.koin || 300) * 2
+      };
+      addToArmory(user, craftedItem);
+      equipFromArmory(user, recipe.id);
 
       saveRpgDb();
       return reply(`

@@ -1,4 +1,4 @@
-// plugins/menu.js - Menu Tampilan Bot Interaktif & Lengkap
+// plugins/menu.js - Menu Tampilan Bot Ringkas, Estetik & Tidak Kepanjangan
 import fs from 'fs';
 import { config } from '../config.js';
 
@@ -18,137 +18,119 @@ export default {
   async run({ sock, jid, msg, prefix, senderName, plugins, startTime }) {
     const uptime = formatUptime(Date.now() - startTime);
 
-    // Daftar menu yang terstruktur dan rapi
+    // Struktur menu terpadat & ringkas (1 baris per perintah agar tidak kepanjangan)
     const menuStructure = [
       {
         category: '🤖 AI & OCR',
         items: [
-          { cmd: 'ai', param: '<pertanyaan>', desc: 'Tanya AI ChatGPT / Gemini gratis' },
-          { cmd: 'wiki', param: '<topik>', desc: 'Cari ensiklopedia di Wikipedia' },
-          { cmd: 'ocr', param: '(reply foto)', desc: 'Ekstrak & salin teks dari gambar' }
+          { cmd: 'ai', param: '<teks>', desc: 'Tanya AI Gemini/GPT' },
+          { cmd: 'wiki', param: '<topik>', desc: 'Ensiklopedia Wikipedia' },
+          { cmd: 'ocr', param: '', desc: 'Ekstrak teks dari foto' }
         ]
       },
       {
-        category: '🎵 MUSIK & MEDIA DOWNLOADER',
+        category: '🎵 DOWNLOADER',
         items: [
-          { cmd: 'play / ytmp3', param: '<judul/link>', desc: 'Download audio MP3 dari YouTube' },
-          { cmd: 'ytmp4', param: '<link>', desc: 'Download video YouTube hingga 720p' },
-          { cmd: 'tiktok', param: '<link>', desc: 'Download video TikTok tanpa watermark' },
-          { cmd: 'spotify', param: '<link>', desc: 'Download lagu dari Spotify' },
-          { cmd: 'ig / twitter / fb', param: '<link>', desc: 'Download video sosmed' }
+          { cmd: 'play', param: '<judul>', desc: 'Unduh MP3 YouTube/SC' },
+          { cmd: 'ytmp4', param: '<link>', desc: 'Unduh video YouTube' },
+          { cmd: 'tiktok', param: '<link>', desc: 'Unduh video TikTok tanpa WM' },
+          { cmd: 'spotify', param: '<link>', desc: 'Unduh lagu Spotify' },
+          { cmd: 'ig', param: '<link>', desc: 'Unduh video Instagram/FB' }
         ]
       },
       {
-        category: '🎨 STIKER & MEDIA TOOLS',
+        category: '🎨 STIKER & MEDIA',
         items: [
-          { cmd: 's / sticker', param: '(caption/reply foto)', desc: 'Ubah gambar/video jadi stiker WebP' },
-          { cmd: 'wm / take', param: '<pack|author>', desc: 'Ganti nama pack/author stiker' },
-          { cmd: 'toimg / getimage', param: '(reply stiker)', desc: 'Ubah stiker kembali jadi foto biasa' },
-          { cmd: 'tts', param: '<teks>', desc: 'Ubah teks jadi Voice Note suara Google' }
+          { cmd: 's', param: '', desc: 'Ubah gambar/video jadi stiker' },
+          { cmd: 'wm', param: '<pack|author>', desc: 'Ganti nama pack stiker' },
+          { cmd: 'toimg', param: '', desc: 'Ubah stiker jadi foto biasa' },
+          { cmd: 'tts', param: '<teks>', desc: 'Voice note suara Google' }
         ]
       },
       {
-        category: '🔍 PENCARIAN & GAMBAR',
+        category: '🔍 PENCARIAN & ANIME',
         items: [
-          { cmd: 'pinterest', param: '<kata kunci>', desc: 'Cari gambar aesthetic Pinterest / HD' },
-          { cmd: 'yts', param: '<kata kunci>', desc: 'Cari video di YouTube' }
-        ]
-      },
-      {
-        category: '🌸 ANIME & WALLPAPER',
-        items: [
-          { cmd: 'anime', param: '<judul>', desc: 'Info lengkap anime dari AniList' },
-          { cmd: 'manga', param: '<judul>', desc: 'Info manga / manhwa / komik' },
+          { cmd: 'pinterest', param: '<kata>', desc: 'Cari foto Pinterest HD' },
+          { cmd: 'yts', param: '<kata>', desc: 'Pencarian video YouTube' },
+          { cmd: 'anime', param: '<judul>', desc: 'Info anime dari AniList' },
           { cmd: 'chara', param: '<nama>', desc: 'Info karakter anime' },
-          { cmd: 'kitsune / waifu / neko', param: '', desc: 'Wallpaper anime aesthetic HD' },
-          { cmd: 'quoteanime', param: '', desc: 'Kata-kata bijak karakter anime' }
+          { cmd: 'waifu', param: '', desc: 'Wallpaper anime aesthetic' }
         ]
       },
       {
         category: '⚔️ RPG & PETUALANGAN',
         items: [
-          { cmd: 'adventure / adv', param: '', desc: 'Jelajahi hutan dungeon, lawan monster & dapatkan EXP' },
-          { cmd: 'mining / nambang', param: '', desc: 'Tambang batu, besi, emas & kristal berharga' },
-          { cmd: 'profile / status', param: '', desc: 'Lihat status level, HP, stamina, koin & perlengkapan' },
-          { cmd: 'inv / tas', param: '', desc: 'Buka tas penyimpanan material & ramuan' },
-          { cmd: 'heal', param: '', desc: 'Gunakan ramuan untuk memulihkan darah (HP)' },
-          { cmd: 'daily / klaim', param: '', desc: 'Ambil jatah koin harian & ramuan gratis tiap 24 jam' },
-          { cmd: 'shop / toko', param: '', desc: 'Beli ramuan, beliung, & perlengkapan baru' },
-          { cmd: 'jual', param: '<nama/all>', desc: 'Jual hasil tambang & kayu jadi koin emas' },
-          { cmd: 'craft', param: '<resep>', desc: 'Tempa pedang & zirah tempur lebih kuat' },
-          { cmd: 'top / leaderboard', param: '', desc: 'Peringkat 10 petualang terkuat di bot' },
-          { cmd: 'transfer', param: '@tag <koin>', desc: 'Kirim koin emas ke rekan petualang lain' },
-          { cmd: 'duel / pvp', param: '@tag <koin>', desc: 'Tantang duel PvP adu kuat antar anggota grup' },
-          { cmd: 'raid / boss', param: '', desc: 'Panggil / cek status World Boss Raid monster raksasa' },
-          { cmd: 'serang / hit', param: '', desc: 'Serang Boss Raid bersama anggota grup untuk raih hadiah' }
+          { cmd: 'adv', param: '', desc: 'Petualang dungeon & raih EXP' },
+          { cmd: 'mining', param: '', desc: 'Tambang batu, besi, emas & kristal' },
+          { cmd: 'profile', param: '', desc: 'Lihat status HP, level & gear' },
+          { cmd: 'inv', param: '', desc: 'Cek isi tas material & ramuan' },
+          { cmd: 'lemari', param: '', desc: 'Gudang senjata & zirah kamu' },
+          { cmd: 'equip', param: '<id>', desc: 'Pasang perlengkapan dari lemari' },
+          { cmd: 'jualeq', param: '<id>', desc: 'Jual perlengkapan bekas (50% refund)' },
+          { cmd: 'heal', param: '', desc: 'Minum ramuan pemulih darah HP' },
+          { cmd: 'daily', param: '', desc: 'Klaim hadiah koin harian gratis' },
+          { cmd: 'shop', param: '', desc: 'Toko gear (Bronze s/d Eternal)' },
+          { cmd: 'jual', param: '<nama/all>', desc: 'Tukar hasil tambang jadi koin' },
+          { cmd: 'craft', param: '<id>', desc: 'Tempa pedang & zirah tempur' },
+          { cmd: 'top', param: '', desc: 'Peringkat petualang terkuat' },
+          { cmd: 'duel', param: '@tag <koin>', desc: 'Tantang duel PvP antar pemain' },
+          { cmd: 'raid', param: '', desc: 'World Boss Raid monster raksasa' },
+          { cmd: 'serang', param: '', desc: 'Pukul Boss Raid bersama anggota' }
         ]
       },
       {
         category: '🎮 GAME & HIBURAN',
         items: [
-          { cmd: 'susunkata', param: '', desc: 'Game tebak dan susun huruf acak' },
-          { cmd: 'caklontong', param: '', desc: 'Tebak-tebakan lucu & teka-teki logika' },
-          { cmd: 'menyerah', param: '', desc: 'Menyerah dari ronde game yang berjalan' }
+          { cmd: 'susunkata', param: '', desc: 'Tebak susun kata acak' },
+          { cmd: 'caklontong', param: '', desc: 'Teka-teki logika Cak Lontong' },
+          { cmd: 'menyerah', param: '', desc: 'Menyerah dari game aktif' }
         ]
       },
       {
-        category: '📅 INFORMASI & UTILITAS',
+        category: '📅 INFORMASI & UTILS',
         items: [
-          { cmd: 'cuaca', param: '<kota>', desc: 'Cek prakiraan cuaca & temperatur kota' },
-          { cmd: 'sholat', param: '<kota>', desc: 'Jadwal sholat 5 waktu harian' },
-          { cmd: 'gempa', param: '', desc: 'Info gempa bumi BMKG terkini + peta guncangan' },
-          { cmd: 'tugas / deadline', param: '', desc: 'Catat & pantau daftar tugas akademik' }
+          { cmd: 'cuaca', param: '<kota>', desc: 'Prakiraan cuaca kota' },
+          { cmd: 'sholat', param: '<kota>', desc: 'Jadwal sholat 5 waktu' },
+          { cmd: 'gempa', param: '', desc: 'Info gempa BMKG terkini' },
+          { cmd: 'tugas', param: '', desc: 'Pengingat tugas akademik' },
+          { cmd: 'calc', param: '<rumus>', desc: 'Hitung kalkulator kilat' },
+          { cmd: 'short', param: '<url>', desc: 'Perpendek link TinyURL' },
+          { cmd: 'qr', param: '<teks>', desc: 'Bikin QR Code instan' },
+          { cmd: 'ping', param: '', desc: 'Cek kecepatan respon bot' }
         ]
       },
       {
-        category: '⚙️ ALAT & KONVERSI',
+        category: '👥 GRUP ADMIN',
         items: [
-          { cmd: 'tr', param: '<kode> <teks>', desc: 'Penerjemah bahasa (contoh: .tr en Halo)' },
-          { cmd: 'calc', param: '<rumus>', desc: 'Kalkulator hitung matematika instan' },
-          { cmd: 'short', param: '<url>', desc: 'Perpendek link panjang via TinyURL' },
-          { cmd: 'qr', param: '<teks>', desc: 'Buat gambar QR Code instan' },
-          { cmd: 'ping / speed', param: '', desc: 'Cek latency dan kecepatan server' },
-          { cmd: 'owner', param: '', desc: 'Informasi kontak pemilik bot' }
-        ]
-      },
-      {
-        category: '👥 PENGELOLA GRUP',
-        items: [
-          { cmd: 'hidetag', param: '<pesan>', desc: 'Tag seluruh anggota tanpa teks terlihat' },
-          { cmd: 'tagall', param: '<pesan>', desc: 'Tag seluruh anggota secara terbuka' },
-          { cmd: 'linkgc', param: '', desc: 'Ambil link tautan undangan grup' },
-          { cmd: 'group', param: '<open/close>', desc: 'Buka atau tutup izin obrolan grup' }
+          { cmd: 'hidetag', param: '<teks>', desc: 'Tag seluruh anggota tersembunyi' },
+          { cmd: 'tagall', param: '<teks>', desc: 'Tag seluruh anggota terbuka' },
+          { cmd: 'linkgc', param: '', desc: 'Ambil link undangan grup' },
+          { cmd: 'group', param: '<open/close>', desc: 'Buka atau tutup izin obrolan' }
         ]
       }
     ];
 
-    // Bangun isi menu
+    // Bangun menu dalam format 1 baris kompak per perintah
     let menuBody = '';
     for (const sec of menuStructure) {
       menuBody += `\n*${sec.category}*\n`;
       for (const item of sec.items) {
-        const formattedCmd = item.cmd.split('/').map(c => `\`${prefix}${c.trim()}\``).join(' / ');
         const paramStr = item.param ? ` ${item.param}` : '';
-        menuBody += `  › ${formattedCmd}${paramStr}\n    _${item.desc}_\n`;
+        menuBody += `  › \`${prefix}${item.cmd}\`${paramStr} ─ _${item.desc}_\n`;
       }
     }
 
     const header = `
 ╭━━━━━「 *${config.botName.toUpperCase()}* 」━━━━━╮
 ┃ 👤 *Halo, ${senderName}!*
-┃ 👑 *Developer:* ${config.ownerName}
-┃ ⏱️ *Uptime:* ${uptime}
-┃ 🧩 *Total Modul:* ${plugins.length} Plugin
+┃ ⏱️ *Uptime:* ${uptime} | 🧩 *Modul:* ${plugins.length}
 ┃ ⚡ *Prefix:* [ ${config.prefixes.join(' ')} ]
 ╰━━━━━━━━━━━━━━━━━━━━━━━╯
 `.trim();
 
     const footer = `
 ╭───────────────────────╮
-│ 💡 *Tips Penggunaan:*
-│ • Mau simpan stiker jadi foto? Reply stiker ketik \`${prefix}toimg\`
-│ • Mau dengerin lagu? Ketik \`${prefix}play judul lagu\`
-│ • Gabut? Ajak main \`${prefix}susunkata\` atau \`${prefix}caklontong\`
+│ 💡 *Tips:* Ketik \`${prefix}adv\` untuk petualang atau \`${prefix}shop\` untuk beli perlengkapan!
 ╰───────────────────────╯
 🔗 *GitHub:* ${config.github}
 `.trim();
