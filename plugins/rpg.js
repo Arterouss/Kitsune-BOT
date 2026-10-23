@@ -8,8 +8,14 @@ import {
   SHOP_ITEMS,
   MATERIAL_PRICES,
   CRAFT_RECIPES,
-  MONSTERS
+  MONSTERS,
+  RAID_BOSSES
 } from '../lib/rpg.js';
+
+// Global memory state for active group duels & boss raids
+global.rpgDuels = global.rpgDuels || {};
+global.rpgRaids = global.rpgRaids || {};
+global.rpgRaidCooldowns = global.rpgRaidCooldowns || {};
 
 // Visual progress bar helper
 function renderBar(current, max, length = 10) {
@@ -38,11 +44,13 @@ export default {
     'sell', 'jual',
     'craft', 'tempa',
     'leaderboard', 'top', 'lb',
-    'transfer', 'pay'
+    'transfer', 'pay',
+    'duel', 'pvp', 'terima', 'terimaduel', 'gas', 'tolak', 'tolakduel',
+    'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi'
   ],
   category: 'rpg',
-  description: 'Sistem Petualangan RPG, Leveling, Mining, Toko, dan Leaderboard',
-  async run({ sock, jid, msg, command, args, prefix, sender, senderName, reply }) {
+  description: 'Sistem Petualangan RPG, Leveling, Mining, Toko, Duel PvP, dan Boss Raid',
+  async run({ sock, jid, msg, command, args, prefix, sender, senderName, isGroup, reply }) {
     const user = getUser(sender, senderName);
     const now = Date.now();
 
@@ -72,6 +80,8 @@ export default {
 ┃  • Menang Adventure: ${formatNumber(user.stats.adventures)} kali
 ┃  • Monster Dibantai: ${formatNumber(user.stats.monstersKilled)} ekor
 ┃  • Tambang Dikeruk: ${formatNumber(user.stats.minedCount)} kali
+┃  • Menang Duel PvP: ${user.stats.pvpWins || 0}W / ${user.stats.pvpLosses || 0}L
+┃  • Boss Raid Gugur: ${user.stats.raidBossesKilled || 0} ekor
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 💡 _Ketik *${prefix}adventure* untuk bertualang atau *${prefix}inv* untuk cek tas._
@@ -659,6 +669,444 @@ ${rows}
       return reply(`💸 *TRANSFER BERHASIL!*
 Telah mengirimkan *${formatNumber(amount)} Gold* kepada *${targetUser.name}*!
 Sisa saldo kamu: *${formatNumber(user.money)} Gold*.`);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 13. TANTANGAN PVP DUEL (.duel / .pvp)
+    // ──────────────────────────────────────────────────────────
+    if (['duel', 'pvp'].includes(command)) {
+      if (!isGroup) {
+        return reply('⚠️ Fitur duel antar pemain hanya bisa dimainkan di dalam grup WhatsApp!');
+      }
+
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.participant;
+      const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+      const targetJid = mentioned || quoted;
+
+      if (!targetJid) {
+        return reply(`⚔️ *TANTANG DUEL TEMAN!*\nFormat: *${prefix}duel @teman <taruhan_koin>*\nContoh: *${prefix}duel @user 500*\n_(Isi 0 jika tanpa taruhan)_`);
+      }
+
+      if (targetJid === sender) {
+        return reply('😅 Kamu tidak bisa menantang dirimu sendiri untuk duel!');
+      }
+
+      if (targetJid.includes(sock.user?.id?.split(':')[0])) {
+        return reply('🤖 Bot tidak bisa diajak duel! Tantang anggota grup yang lain.');
+      }
+
+      let betStr = args.replace(/@\d+/g, '').trim();
+      let bet = parseInt(betStr);
+      if (isNaN(bet) || bet < 0) bet = 0;
+
+      const targetUser = getUser(targetJid, 'Kawan Petualang');
+
+      if (bet > 0) {
+        if (user.money < bet) {
+          return reply(`💸 Koin kamu tidak cukup untuk taruhan ini!\nSaldo kamu: *${formatNumber(user.money)} Gold*, Taruhan: *${formatNumber(bet)} Gold*.`);
+        }
+        if (targetUser.money < bet) {
+          return reply(`💸 Lawanmu tidak punya cukup koin untuk taruhan ini!\nSaldo ${targetUser.name}: *${formatNumber(targetUser.money)} Gold*.`);
+        }
+      }
+
+      if (user.hp < 25) {
+        return reply(`⚠️ Darahmu sekarat (HP: ${user.hp}/${user.maxHp})!\nSembuhkan lukamu dengan *${prefix}heal* sebelum bertarung.`);
+      }
+
+      if (targetUser.hp < 25) {
+        return reply(`⚠️ Lawanmu (${targetUser.name}) sedang sekarat (HP: ${targetUser.hp}/${targetUser.maxHp})!\nTunggu dia pulih terlebih dahulu.`);
+      }
+
+      if (global.rpgDuels[jid]) {
+        return reply(`⚠️ Masih ada duel yang sedang berlangsung atau menunggu konfirmasi di grup ini!\nKetik *${prefix}tolak* jika ingin membatalkannya.`);
+      }
+
+      // Buat sesi duel dengan timer batas waktu 60 detik
+      global.rpgDuels[jid] = {
+        challenger: sender,
+        challengerName: user.name,
+        target: targetJid,
+        targetName: targetUser.name,
+        bet,
+        timer: setTimeout(() => {
+          if (global.rpgDuels[jid]) {
+            reply(`⏳ Waktu konfirmasi duel antara *${user.name}* dan *${targetUser.name}* telah habis! Tantangan dibatalkan.`);
+            delete global.rpgDuels[jid];
+          }
+        }, 60000)
+      };
+
+      const taruhanText = bet > 0 ? `💰 *Taruhan Koin:* ${formatNumber(bet)} Gold` : '💰 *Taruhan:* Adu Kehormatan (0 Gold)';
+
+      return reply(`
+⚔️ *TANTANGAN DUEL TELAH DILAYANGKAN!*
+👤 *Penantang:* ${user.name} (Lv. ${user.level})
+🎯 *Target Lawan:* ${targetUser.name} (Lv. ${targetUser.level})
+${taruhanText}
+
+Kepada *${targetUser.name}*, silakan konfirmasi dalam 60 detik:
+👉 Ketik *${prefix}terima* untuk menyetujui duel!
+👉 Ketik *${prefix}tolak* untuk menolak duel.
+`.trim());
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 14. MENERIMA TANTANGAN DUEL (.terima / .gas / .terimaduel)
+    // ──────────────────────────────────────────────────────────
+    if (['terima', 'terimaduel', 'gas'].includes(command)) {
+      if (!isGroup) return;
+      const session = global.rpgDuels[jid];
+      if (!session) {
+        return reply('⚠️ Tidak ada tantangan duel yang sedang menunggu konfirmasi di grup ini!');
+      }
+
+      if (sender !== session.target) {
+        return reply(`⚠️ Hanya *${session.targetName}* yang berhak menerima tantangan duel ini!`);
+      }
+
+      clearTimeout(session.timer);
+
+      // Re-fetch kedua data pengguna terkini
+      const u1 = getUser(session.challenger, session.challengerName);
+      const u2 = getUser(session.target, session.targetName);
+
+      // Re-validate saldo & HP
+      if (session.bet > 0 && (u1.money < session.bet || u2.money < session.bet)) {
+        delete global.rpgDuels[jid];
+        return reply('❌ Duel dibatalkan karena saldo salah satu pemain tidak mencukupi untuk taruhan!');
+      }
+
+      // Simulasi pertarungan PvP
+      const power1 = (u1.level * 10) + (u1.equipment.weaponAtk || 5) + Math.floor(Math.random() * 30);
+      const def1 = u1.equipment.armorDef || 2;
+
+      const power2 = (u2.level * 10) + (u2.equipment.weaponAtk || 5) + Math.floor(Math.random() * 30);
+      const def2 = u2.equipment.armorDef || 2;
+
+      const dmgTo2 = Math.max(10, power1 - def2);
+      const dmgTo1 = Math.max(10, power2 - def1);
+
+      const score1 = power1 + (u1.hp * 0.4);
+      const score2 = power2 + (u2.hp * 0.4);
+
+      let winner, loser, winDmg, loseDmg;
+      if (score1 >= score2) {
+        winner = u1;
+        loser = u2;
+        winDmg = dmgTo1;
+        loseDmg = dmgTo2;
+      } else {
+        winner = u2;
+        loser = u1;
+        winDmg = dmgTo2;
+        loseDmg = dmgTo1;
+      }
+
+      // Update darah
+      winner.hp = Math.max(1, winner.hp - winDmg);
+      loser.hp = Math.max(1, loser.hp - loseDmg);
+
+      // Taruhan
+      if (session.bet > 0) {
+        loser.money -= session.bet;
+        winner.money += session.bet;
+      }
+
+      // Update statistik
+      winner.stats.pvpWins = (winner.stats.pvpWins || 0) + 1;
+      loser.stats.pvpLosses = (loser.stats.pvpLosses || 0) + 1;
+
+      // EXP
+      const winExp = addExp(winner, 75);
+      const loseExp = addExp(loser, 25);
+
+      delete global.rpgDuels[jid];
+      saveRpgDb();
+
+      let text = `
+⚔️ *DUEL BERLANGSUNG SENJATA BENTROK!*
+💥 *${winner.name}* menghunus ${winner.equipment.weapon} dan mendominasi medan tempur!
+🛡️ *${loser.name}* tertekan oleh gempuran serangan bertubi-tubi!
+
+🏆 *HASIL PERTARUNGAN:*
+🥇 *PEMENANG:* *${winner.name}* (Sisa HP: ${winner.hp}/${winner.maxHp})
+🥈 *KALAH:* *${loser.name}* (Sisa HP: ${loser.hp}/${loser.maxHp})
+
+🎁 *Hadiah Duel:*
+• Pemenang: +${session.bet > 0 ? formatNumber(session.bet) + ' Gold | ' : ''}+75 EXP
+• Kalah: +25 EXP hiburan ${session.bet > 0 ? `(-${formatNumber(session.bet)} Gold)` : ''}
+`.trim();
+
+      if (winExp.leveledUp) {
+        text += `\n\n🎉 *LEVEL UP!* ${winner.name} naik ke *Level ${winExp.newLevel}*!`;
+      }
+
+      return reply(text);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 15. MENOLAK TANTANGAN DUEL (.tolak / .tolakduel)
+    // ──────────────────────────────────────────────────────────
+    if (['tolak', 'tolakduel'].includes(command)) {
+      if (!isGroup) return;
+      const session = global.rpgDuels[jid];
+      if (!session) {
+        return reply('⚠️ Tidak ada tantangan duel yang sedang berjalan di grup ini.');
+      }
+
+      if (sender !== session.target && sender !== session.challenger) {
+        return reply('⚠️ Kamu bukan peserta dari tantangan duel ini!');
+      }
+
+      clearTimeout(session.timer);
+      delete global.rpgDuels[jid];
+      return reply(`🏳️ Tantangan duel antara *${session.challengerName}* dan *${session.targetName}* telah dibatalkan.`);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 16. BOSS RAID GRUP (.raid / .boss / .cekkondisi)
+    // ──────────────────────────────────────────────────────────
+    if (['raid', 'boss', 'cekkondisi'].includes(command)) {
+      if (!isGroup) {
+        return reply('⚠️ Misi Boss Raid adalah pertempuran akbar yang hanya bisa dilakukan di dalam grup!');
+      }
+
+      const activeRaid = global.rpgRaids[jid];
+
+      // Jika ada raid aktif, tampilkan kondisinya
+      if (activeRaid) {
+        const hpBar = renderBar(activeRaid.hp, activeRaid.maxHp, 10);
+        const sisaWaktu = formatDuration(Math.max(0, activeRaid.expiresAt - now));
+        const persenHp = Math.round((activeRaid.hp / activeRaid.maxHp) * 100);
+
+        // Ambil Top 3 kontributor
+        const topHitter = Object.values(activeRaid.contributors)
+          .sort((a, b) => b.damage - a.damage)
+          .slice(0, 3)
+          .map((c, i) => `${i + 1}. *${c.name}*: ${formatNumber(c.damage)} DMG (${c.hits}x Serang)`)
+          .join('\n');
+
+        return reply(`
+╭━━━━━「 👑 *STATUS BOSS RAID AKTIF* 」━━━━━╮
+┃ 👹 *Musuh:* ${activeRaid.name}
+┃ 📜 _${activeRaid.title}_
+┃ ⏳ *Sisa Waktu:* ${sisaWaktu}
+┃
+┃ ❤️ *Darah Boss:*
+┃ [${hpBar}] ${formatNumber(activeRaid.hp)} / ${formatNumber(activeRaid.maxHp)} (${persenHp}%)
+┃
+┃ 🏆 *Top Penyerang Sementara:*
+${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Belum ada yang menyerang!_'}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+⚔️ *Ayo serang bersama!* Ketik: *${prefix}serang*
+`.trim());
+      }
+
+      // Jika belum ada raid aktif, periksa cooldown spawn
+      const lastRaid = global.rpgRaidCooldowns[jid] || 0;
+      const raidCooldown = 600000; // 10 menit jeda antar raid per grup
+      if (now - lastRaid < raidCooldown) {
+        const sisa = formatDuration(raidCooldown - (now - lastRaid));
+        return reply(`🛡️ Wilayah ini masih aman dan tenang!\nMonster raksasa berikutnya baru akan muncul dalam: *${sisa}*.`);
+      }
+
+      // Ambil boss acak dari katalog
+      const bossData = RAID_BOSSES[Math.floor(Math.random() * RAID_BOSSES.length)];
+
+      global.rpgRaids[jid] = {
+        id: bossData.id,
+        name: bossData.name,
+        title: bossData.title,
+        hp: bossData.hp,
+        maxHp: bossData.hp,
+        atk: bossData.atk,
+        rewardGold: bossData.rewardGold,
+        rewardExp: bossData.rewardExp,
+        drops: bossData.drops,
+        startedAt: now,
+        expiresAt: now + (15 * 60 * 1000), // 15 menit
+        contributors: {},
+        timer: setTimeout(() => {
+          if (global.rpgRaids[jid]) {
+            reply(`⏳ *WAKTU HABIS!* ${bossData.name} tertawa congkak dan melarikan diri ke sarangnya!\nAnggota grup gagal menaklukkan boss raid.`);
+            global.rpgRaidCooldowns[jid] = Date.now();
+            delete global.rpgRaids[jid];
+          }
+        }, 15 * 60 * 1000)
+      };
+
+      const hpBar = renderBar(bossData.hp, bossData.hp, 10);
+
+      return reply(`
+🔥━━━━━「 🚨 *WORLD BOSS RAID TELAH MUNCUL!* 🚨 」━━━━━🔥
+Tanah bergetar hebat! Makhluk legendaris telah menampakkan diri di wilayah grup ini!
+
+👹 *Nama:* ${bossData.name}
+📜 *Gelar:* _${bossData.title}_
+❤️ *HP Total:* [${hpBar}] ${formatNumber(bossData.hp)} HP
+⏱️ *Batas Waktu:* 15 Menit
+
+🎁 *Total Hadiah Dibagikan:*
+• 💰 ${formatNumber(bossData.rewardGold)} Koin Emas
+• 📈 ${formatNumber(bossData.rewardExp)} EXP
+• 💎 Berlian Murni & Bijih Berharga untuk penyerang terhebat!
+
+⚔️ *Perintah Menyerang:*
+Ketik: *${prefix}serang*
+_(Semua anggota grup bisa ikut menyerang bersama-sama!)_
+`.trim());
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 17. MENYERANG BOSS RAID (.serang / .hit / .attack)
+    // ──────────────────────────────────────────────────────────
+    if (['serang', 'hit', 'attack'].includes(command)) {
+      if (!isGroup) return;
+      const raid = global.rpgRaids[jid];
+      if (!raid) {
+        return reply(`⚠️ Tidak ada Boss Raid yang sedang berlangsung di grup ini!\nKetik *${prefix}raid* untuk memanggil monster raksasa.`);
+      }
+
+      if (user.stamina < 10) {
+        return reply(`⚡ Staminamu tidak cukup untuk menyerang monster raksasa (${user.stamina}/100)!\nMinimal butuh *10 Stamina*.`);
+      }
+
+      if (user.hp <= 20) {
+        return reply(`⚠️ Darahmu sekarat (HP: ${user.hp}/${user.maxHp})!\nTerlalu berbahaya untuk mendekati boss. Ketik *${prefix}heal* dulu.`);
+      }
+
+      // Cooldown pukul per pemain (10 detik)
+      const lastHit = raid.contributors[sender]?.lastHitTime || 0;
+      if (now - lastHit < 10000) {
+        const sisaDetik = Math.ceil((10000 - (now - lastHit)) / 1000);
+        return reply(`⏳ Napasmu masih terengah-engah! Tunggu *${sisaDetik} detik* lagi sebelum mengayunkan senjata kembali.`);
+      }
+
+      // Kurangi stamina
+      user.stamina -= 10;
+
+      // Hitung damage pemain ke boss
+      const weaponBonus = user.equipment.weaponAtk || 5;
+      const playerDmg = Math.floor((user.level * 9) + weaponBonus + (Math.random() * 35)) + 25;
+
+      // Serangan balik boss ke pemain (dikurangi zirah)
+      const armorBonus = user.equipment.armorDef || 2;
+      const counterDmg = Math.max(5, Math.floor((raid.atk * 0.35) + (Math.random() * 10)) - armorBonus);
+      user.hp = Math.max(1, user.hp - counterDmg);
+
+      // Catat kontribusi
+      if (!raid.contributors[sender]) {
+        raid.contributors[sender] = {
+          jid: sender,
+          name: user.name,
+          damage: 0,
+          hits: 0,
+          lastHitTime: now
+        };
+      }
+      raid.contributors[sender].damage += playerDmg;
+      raid.contributors[sender].hits += 1;
+      raid.contributors[sender].lastHitTime = now;
+      user.stats.raidDamageDealt = (user.stats.raidDamageDealt || 0) + playerDmg;
+
+      // Kurangi darah boss
+      raid.hp = Math.max(0, raid.hp - playerDmg);
+
+      // Jika boss masih hidup
+      if (raid.hp > 0) {
+        saveRpgDb();
+        const hpBar = renderBar(raid.hp, raid.maxHp, 10);
+        const persen = Math.round((raid.hp / raid.maxHp) * 100);
+
+        return reply(`
+💥 *SERANGAN TELAK MENGHANTAM!*
+👤 *${user.name}* mengayunkan *${user.equipment.weapon}*!
+🗡️ Damage Dihasilkan: *-${formatNumber(playerDmg)} HP*
+💔 Serangan Balik Boss: -${counterDmg} HP (Darahmu: ${user.hp}/${user.maxHp})
+⚡ Sisa Stamina: ${user.stamina}/${user.maxStamina}
+
+👹 *Kondisi ${raid.name}:*
+[${hpBar}] ${formatNumber(raid.hp)} / ${formatNumber(raid.maxHp)} HP (${persen}%)
+
+🔥 _Ayo serang lagi ketik *${prefix}serang*!_
+`.trim());
+      }
+
+      // ────────────────────────────────────────────────────────
+      // BOSS BERHASIL DIKALAHKAN! (VICTORY & DISTRIBUSI HADIAH)
+      // ────────────────────────────────────────────────────────
+      clearTimeout(raid.timer);
+      global.rpgRaidCooldowns[jid] = Date.now();
+
+      const contributorsList = Object.values(raid.contributors)
+        .sort((a, b) => b.damage - a.damage);
+
+      const totalDmgDealt = contributorsList.reduce((acc, c) => acc + c.damage, 0) || 1;
+
+      let rewardSummary = [];
+
+      for (let i = 0; i < contributorsList.length; i++) {
+        const c = contributorsList[i];
+        const participantUser = getUser(c.jid, c.name);
+        const ratio = c.damage / totalDmgDealt;
+
+        // Porsi hadiah emas & exp sesuai persentase damage
+        let goldShare = Math.floor(raid.rewardGold * ratio);
+        let expShare = Math.floor(raid.rewardExp * ratio);
+        let dropItems = [];
+
+        if (i === 0) {
+          // MVP (Peringkat 1)
+          goldShare += 2500;
+          expShare += 600;
+          participantUser.inventory.berlian += (raid.drops.berlian || 2);
+          participantUser.inventory.emas += (raid.drops.emas || 5);
+          dropItems.push(`💎 +${raid.drops.berlian || 2} Berlian`, `🪙 +${raid.drops.emas || 5} Emas`);
+        } else if (i === 1) {
+          // Peringkat 2
+          goldShare += 1000;
+          expShare += 300;
+          participantUser.inventory.berlian += 1;
+          participantUser.inventory.emas += 3;
+          dropItems.push(`💎 +1 Berlian`, `🪙 +3 Emas`);
+        } else if (i === 2) {
+          // Peringkat 3
+          goldShare += 500;
+          expShare += 150;
+          participantUser.inventory.emas += 2;
+          participantUser.inventory.besi += 5;
+          dropItems.push(`🪙 +2 Emas`, `⚙️ +5 Besi`);
+        } else {
+          // Peserta Lainnya
+          participantUser.inventory.besi += 3;
+          dropItems.push(`⚙️ +3 Besi`);
+        }
+
+        participantUser.money += goldShare;
+        participantUser.stats.raidBossesKilled = (participantUser.stats.raidBossesKilled || 0) + 1;
+        const lvlRes = addExp(participantUser, expShare);
+
+        const badge = i === 0 ? '🥇 *MVP*' : i === 1 ? '🥈 *#2*' : i === 2 ? '🥉 *#3*' : `🏅 *#${i + 1}*`;
+        rewardSummary.push(`${badge} *${c.name}*
+   💥 Total Damage: ${formatNumber(c.damage)} (${Math.round(ratio * 100)}%)
+   🎁 Hadiah: +${formatNumber(goldShare)} Gold, +${expShare} EXP${dropItems.length > 0 ? ', ' + dropItems.join(', ') : ''}${lvlRes.leveledUp ? ' (🎉 *LEVEL UP!*)' : ''}`);
+      }
+
+      delete global.rpgRaids[jid];
+      saveRpgDb();
+
+      return reply(`
+🎉🎉 *VICTORY! BOSS RAID BERHASIL DITUMBANGKAN!* 🎉🎉
+Raksasa legendaris *${raid.name}* akhirnya roboh dan musnah menjadi abu oleh kekuatan kerja sama petualang grup ini!
+
+📊 *PAPAN KONTRIBUSI & PEMBAGIAN HADIAH:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${rewardSummary.join('\n\n')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌟 _Selamat kepada seluruh pejuang! Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
+`.trim());
     }
   }
 };

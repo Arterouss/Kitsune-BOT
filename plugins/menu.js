@@ -77,7 +77,10 @@ export default {
           { cmd: 'jual', param: '<nama/all>', desc: 'Jual hasil tambang & kayu jadi koin emas' },
           { cmd: 'craft', param: '<resep>', desc: 'Tempa pedang & zirah tempur lebih kuat' },
           { cmd: 'top / leaderboard', param: '', desc: 'Peringkat 10 petualang terkuat di bot' },
-          { cmd: 'transfer', param: '@tag <koin>', desc: 'Kirim koin emas ke rekan petualang lain' }
+          { cmd: 'transfer', param: '@tag <koin>', desc: 'Kirim koin emas ke rekan petualang lain' },
+          { cmd: 'duel / pvp', param: '@tag <koin>', desc: 'Tantang duel PvP adu kuat antar anggota grup' },
+          { cmd: 'raid / boss', param: '', desc: 'Panggil / cek status World Boss Raid monster raksasa' },
+          { cmd: 'serang / hit', param: '', desc: 'Serang Boss Raid bersama anggota grup untuk raih hadiah' }
         ]
       },
       {
