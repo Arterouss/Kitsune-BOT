@@ -287,16 +287,14 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         if (dropPotion > 0) drops.push(`🧪 +1 Ramuan HP`);
 
         let text = `
-⚔️ *PETUALANGAN SELESAI (KEMENANGAN!)*
-Kamu menjelajahi Hutan Rimba dan bertemu dengan *${monster.name}*!
+⚔️ *PETUALANGAN SELESAI*
+Kamu melawan *${monster.name}* dan berhasil menang!
 
-Pertarungan sengit terjadi:
-💥 Seranganmu berhasil melumpuhkan monster!
-❤️ Darah berkurang: -${rawDmg} HP (Sisa: ${user.hp}/${user.maxHp})
-⚡ Stamina terpakai: -20 (Sisa: ${user.stamina}/${user.maxStamina})
+❤️ Darah: -${rawDmg} HP (Sisa: ${user.hp}/${user.maxHp})
+⚡ Stamina: -20 (Sisa: ${user.stamina}/${user.maxStamina})
 
-🎁 *Hadiah Yang Didapat:*
-• 💰 +${formatNumber(goldGained)} Koin Emas
+🎁 *Hadiah:*
+• 💰 +${formatNumber(goldGained)} Koin
 • 📈 +${expGained} EXP
 • ${drops.join('\n• ')}
 `.trim();
@@ -317,15 +315,14 @@ Pertarungan sengit terjadi:
         saveRpgDb();
 
         return reply(`
-💀 *KAMU TERPOJOK & MELARIKAN DIRI!*
-Kamu bertemu monster buas *${monster.name}*, namun kekuatanmu belum cukup untuk menaklukkannya!
+💀 *KAMU KALAH & MELARIKAN DIRI*
+Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkannya.
 
-💥 Kamu terluka parah dan kabur ke tempat aman:
-❤️ Kehilangan: -${severeDmg} HP (Sisa HP: ${user.hp}/${user.maxHp})
+❤️ Darah: -${severeDmg} HP (Sisa: ${user.hp}/${user.maxHp})
 ⚡ Stamina: -20
 📈 EXP Hiburan: +${consExp} EXP
 
-💡 _Sembuhkan lukamu dengan *${prefix}heal* atau tempa senjata lebih kuat di *${prefix}craft*._
+💡 _Gunakan *${prefix}heal* untuk memulihkan darah._
 `.trim());
       }
     }
@@ -1060,22 +1057,19 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       const hpBar = renderBar(bossData.hp, bossData.hp, 10);
 
       return reply(`
-🔥━━━━━「 🚨 *WORLD BOSS RAID TELAH MUNCUL!* 🚨 」━━━━━🔥
-Tanah bergetar hebat! Makhluk legendaris telah menampakkan diri di wilayah grup ini!
+🔥━━━━━「 🚨 *WORLD BOSS MUNCUL!* 🚨 」━━━━━🔥
+*${bossData.name}* telah muncul di grup ini!
 
 👹 *Nama:* ${bossData.name}
-📜 *Gelar:* _${bossData.title}_
 ❤️ *HP Total:* [${hpBar}] ${formatNumber(bossData.hp)} HP
 ⏱️ *Batas Waktu:* 15 Menit
 
-🎁 *Total Hadiah Dibagikan:*
-• 💰 ${formatNumber(bossData.rewardGold)} Koin Emas
+🎁 *Total Hadiah:*
+• 💰 ${formatNumber(bossData.rewardGold)} Koin
 • 📈 ${formatNumber(bossData.rewardExp)} EXP
-• 💎 Berlian Murni & Bijih Berharga untuk penyerang terhebat!
+• 💎 Berlian & Emas untuk penyerang teratas
 
-⚔️ *Perintah Menyerang:*
-Ketik: *${prefix}serang*
-_(Semua anggota grup bisa ikut menyerang bersama-sama!)_
+⚔️ *Ayo serang bersama!* Ketik: *${prefix}serang*
 `.trim());
     }
 
@@ -1218,14 +1212,14 @@ _(Semua anggota grup bisa ikut menyerang bersama-sama!)_
       saveRpgDb();
 
       return reply(`
-🎉🎉 *VICTORY! BOSS RAID BERHASIL DITUMBANGKAN!* 🎉🎉
-Raksasa legendaris *${raid.name}* akhirnya roboh dan musnah menjadi abu oleh kekuatan kerja sama petualang grup ini!
+🎉 *BOSS RAID SELESAI!*
+*${raid.name}* berhasil dikalahkan oleh anggota grup!
 
-📊 *PAPAN KONTRIBUSI & PEMBAGIAN HADIAH:*
+📊 *PAPAN KONTRIBUSI & HADIAH:*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${rewardSummary.join('\n\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌟 _Selamat kepada seluruh pejuang! Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
+🌟 _Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
 `.trim());
     }
   }
