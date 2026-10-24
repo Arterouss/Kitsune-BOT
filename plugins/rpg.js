@@ -12,7 +12,8 @@ import {
   RAID_BOSSES,
   addToArmory,
   equipFromArmory,
-  sellFromArmory
+  sellFromArmory,
+  rollGacha
 } from '../lib/rpg.js';
 
 // Global memory state for active group duels & boss raids
@@ -50,6 +51,7 @@ export default {
     'buy', 'beli',
     'sell', 'jual',
     'craft', 'tempa',
+    'gacha', 'pull', 'tarik',
     'leaderboard', 'top', 'lb',
     'transfer', 'pay',
     'duel', 'pvp', 'terima', 'terimaduel', 'gas', 'tolak', 'tolakduel',
@@ -82,6 +84,7 @@ export default {
 ┃ 🗡️ *Senjata:* ${user.equipment.weapon} (+${user.equipment.weaponAtk} ATK)
 ┃ 🛡️ *Zirah:* ${user.equipment.armor} (+${user.equipment.armorDef} DEF)
 ┃ ⛏️ *Beliung:* ${user.equipment.pickaxe}
+┃ 🎯 *Pity Gacha:* ${user.gachaPity || 0}/50 (Garansi 5★)
 ┃
 ┃ 📜 *Catatan Petualang:*
 ┃  • Menang Adventure: ${formatNumber(user.stats.adventures)} kali
@@ -89,6 +92,7 @@ export default {
 ┃  • Tambang Dikeruk: ${formatNumber(user.stats.minedCount)} kali
 ┃  • Menang Duel PvP: ${user.stats.pvpWins || 0}W / ${user.stats.pvpLosses || 0}L
 ┃  • Boss Raid Gugur: ${user.stats.raidBossesKilled || 0} ekor
+┃  • Total Tarikan Gacha: ${formatNumber(user.stats.gachaCount || 0)} kali
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 💡 _Ketik *${prefix}adventure* untuk bertualang atau *${prefix}inv* untuk cek tas._
@@ -901,6 +905,76 @@ Berhasil membuat *${recipe.name}*!
 ✨ Perlengkapan sudah masuk ke lemarimu dan langsung dipasang.
 📊 Cek status terbarumu di *${prefix}profile*.
 `.trim());
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 10B. GACHA SENJATA EKSKLUSIF (.gacha / .pull / .tarik)
+    // ──────────────────────────────────────────────────────────
+    if (['gacha', 'pull', 'tarik'].includes(command)) {
+      const mode = args?.trim().toLowerCase();
+
+      if (!mode || (!['1', '10', 'single', 'multi'].includes(mode))) {
+        const pityBar = renderBar(user.gachaPity || 0, 50, 10);
+        const text = `
+╭━━━━━「 🌌 *GACHA SENJATA MYTHIC* 」━━━━━╮
+┃ 👤 *Petualang:* ${user.name}
+┃ 💰 *Koin Kamu:* ${formatNumber(user.money)} Gold
+┃ 🎯 *Pity Garansi:* [${pityBar}] ${user.gachaPity || 0}/50
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+👑 *Senjata Eksklusif 5★ (Tidak Ada di Toko):*
+• ⚔️ *Pedang Excalibur* (+400 ATK) ─ Senjata terkuat cahaya
+• 🗡️ *Pedang Muramasa* (+360 ATK) ─ Pedang terkutuk haus darah
+• 🛡️ *Zirah Aegis* (+290 DEF) ─ Perisai dewa pelindung mutlak
+• ⛏️ *Beliung Mithril* (Tier 6) ─ Beliung tambang kristal suci
+
+💎 *Sistem Pity (Garansi 50x Tarikan):*
+Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kamu **PASTI DIJAMIN 100%** mendapatkan salah satu Senjata 5★ Mythic! (Pity otomatis reset jika dapat 5★).
+
+📊 *Peluang Drop:*
+• 👑 5★ Mythic: *2.5%* (Pity 50x Garansi)
+• ✨ 4★ Epic: *17.5%* (Senjata Naga, Berlian, Emas, Tiket)
+• ⚪ 3★ Rare: *80.0%* (Ramuan Besar, Kitab EXP, Jimat, Material)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *Pilihan Tarik Gacha:*
+• \`${prefix}gacha 1\` ─ 1x Tarik (*150 Gold*)
+• \`${prefix}gacha 10\` ─ 10x Tarik (*1.350 Gold* ─ Hemat 150 Gold!)
+`.trim();
+
+        return reply(text);
+      }
+
+      const times = (mode === '10' || mode === 'multi') ? 10 : 1;
+      const result = rollGacha(user, times);
+
+      if (!result.success) {
+        return reply(`❌ ${result.msg}`);
+      }
+
+      const pityBar = renderBar(result.pity, 50, 10);
+      const headerTitle = times === 10 ? '✨ 10x GACHA RESULT' : '✨ 1x GACHA RESULT';
+
+      let replyMsg = `
+╭━━━━━「 ${headerTitle} 」━━━━━╮
+┃ 👤 *Petualang:* ${user.name}
+┃ 💰 *Sisa Koin:* ${formatNumber(user.money)} Gold
+┃ 🎯 *Pity Saat Ini:* [${pityBar}] ${result.pity}/50
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
+`.trim();
+
+      if (result.got5Star) {
+        replyMsg += `\n\n🎉 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 5★ MYTHIC!*`;
+        replyMsg += `\n✨ Perlengkapan telah tersimpan di *${prefix}lemari*. Pasang dengan *${prefix}equip <nama/id>*!`;
+      } else {
+        const remaining = 50 - result.pity;
+        replyMsg += `\n\n🎯 *Pity Tracker:* Kurang *${remaining} tarikan* lagi menuju Garansi 5★ Mythic!`;
+        replyMsg += `\n💡 Tarik lagi: \`${prefix}gacha ${times}\``;
+      }
+
+      return reply(replyMsg);
     }
 
     // ──────────────────────────────────────────────────────────

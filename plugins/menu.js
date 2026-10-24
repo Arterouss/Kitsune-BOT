@@ -97,6 +97,11 @@ export default {
             desc: "Tukar hasil tambang jadi koin",
           },
           { cmd: "craft", param: "<id>", desc: "Tempa pedang & zirah tempur" },
+          {
+            cmd: "gacha",
+            param: "<1/10>",
+            desc: "Gacha senjata Mythic (Pity 50x)",
+          },
           { cmd: "top", param: "", desc: "Peringkat petualang terkuat" },
           {
             cmd: "duel",
