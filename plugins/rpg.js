@@ -130,7 +130,7 @@ export default {
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 💡 *Menu Interaksi:*
-• Ketik *${prefix}pakai <item>* untuk memakai item pendukung.
+• Ketik *${prefix}use <item>* untuk memakai item pendukung.
 • Ketik *${prefix}jual <nama/all>* untuk jual hasil tambang ke toko.
 • Ketik *${prefix}craft* untuk membuka bengkel tempa perlengkapan.
 • Ketik *${prefix}shop* untuk membeli ramuan & perlengkapan baru.
@@ -460,16 +460,16 @@ Kamu mengayunkan *${user.equipment.pickaxe}* ke dinding batu gua yang dalam...
       if (!args) {
         return reply(`
 🎒 *PENGGUNAAN ITEM PENDUKUNG:*
-Ketik: *${prefix}pakai <nama_item>*
+Ketik: *${prefix}use <nama_item>*
 
 📋 *Daftar Item yang Bisa Dipakai:*
-• \`${prefix}pakai potion_hp\` ─ Minum Ramuan HP (+60 HP)
-• \`${prefix}pakai potion_hp_besar\` ─ Minum Ramuan HP Besar (+160 HP)
-• \`${prefix}pakai potion_stamina\` ─ Minum Ramuan Stamina (+60 Stamina)
-• \`${prefix}pakai potion_stamina_besar\` ─ Minum Ramuan Stamina Besar (+120 Stamina)
-• \`${prefix}pakai kitab_exp\` ─ Membaca Kitab Pengalaman (+250 EXP)
-• \`${prefix}pakai tiket_raid\` ─ Reset Cooldown World Boss grup
-• \`${prefix}pakai jimat_pelindung\` ─ Cek status perlindungan jimat
+• \`${prefix}use potion_hp\` ─ Minum Ramuan HP (+60 HP)
+• \`${prefix}use potion_hp_besar\` ─ Minum Ramuan HP Besar (+160 HP)
+• \`${prefix}use potion_stamina\` ─ Minum Ramuan Stamina (+60 Stamina)
+• \`${prefix}use potion_stamina_besar\` ─ Minum Ramuan Stamina Besar (+120 Stamina)
+• \`${prefix}use kitab_exp\` ─ Membaca Kitab Pengalaman (+250 EXP)
+• \`${prefix}use tiket_raid\` ─ Reset Cooldown World Boss grup
+• \`${prefix}use jimat_pelindung\` ─ Cek status perlindungan jimat
 `.trim());
       }
 
@@ -599,7 +599,7 @@ Jika kamu kalah saat bertarung, jimat ini akan otomatis pecah melindungi nyawamu
 📦 Koleksimu saat ini: *${user.inventory.jimat_pelindung || 0} buah*.`);
       }
 
-      return reply(`❌ Item *"${args}"* tidak dikenali atau tidak bisa dipakai!\nKetik *${prefix}pakai* untuk melihat panduan item.`);
+      return reply(`❌ Item *"${args}"* tidak dikenali atau tidak bisa dipakai!\nKetik *${prefix}use* untuk melihat panduan item.`);
     }
 
     // ──────────────────────────────────────────────────────────
@@ -672,9 +672,9 @@ ${armors.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.nam
 ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *Beli:* \`${prefix}beli <id> <jumlah>\` (Contoh: \`${prefix}beli potion_hp 3\` atau \`${prefix}beli pedang_besi\`)
-💡 *Pakai Item:* \`${prefix}pakai <id>\` (Contoh: \`${prefix}pakai potion_hp\`)
-💡 *Koleksi:* \`${prefix}lemari\` | *Ganti:* \`${prefix}equip <id>\` | *Jual:* \`${prefix}jualeq <id>\`
+💡 *Beli:* \`${prefix}buy <id> <jumlah>\` (Contoh: \`${prefix}buy potion_hp 3\` atau \`${prefix}buy pedang_besi\`)
+💡 *Gunakan Item:* \`${prefix}use <id>\` (Contoh: \`${prefix}use potion_hp\`)
+💡 *Koleksi:* \`${prefix}armory\` | *Ganti:* \`${prefix}equip <id>\` | *Jual:* \`${prefix}jualeq <id>\`
 `.trim();
 
       return reply(text);
@@ -685,7 +685,7 @@ ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.n
     // ──────────────────────────────────────────────────────────
     if (['buy', 'beli'].includes(command)) {
       if (!args) {
-        return reply(`⚠️ Masukkan ID item yang ingin dibeli!\nContoh: *${prefix}beli pedang_besi* atau *${prefix}beli potion_hp 2*\nKetik *${prefix}shop* untuk melihat katalog barang.`);
+        return reply(`⚠️ Masukkan ID item yang ingin dibeli!\nContoh: *${prefix}buy pedang_besi* atau *${prefix}buy potion_hp 2*\nKetik *${prefix}shop* untuk melihat katalog barang.`);
       }
 
       const parts = args.split(' ');
@@ -714,7 +714,7 @@ ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.n
         user.inventory[targetItem.id] = (user.inventory[targetItem.id] || 0) + count;
 
         saveRpgDb();
-        return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.\n💡 Cek tasmu di *${prefix}inv* atau ketik *${prefix}pakai ${targetItem.id}* untuk memakainya.`);
+        return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.\n💡 Cek tasmu di *${prefix}inv* atau ketik *${prefix}use ${targetItem.id}* untuk memakainya.`);
       }
 
       // Pembelian Perlengkapan (Senjata / Zirah / Beliung)

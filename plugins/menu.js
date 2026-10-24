@@ -85,7 +85,7 @@ export default {
           },
           { cmd: "heal", param: "", desc: "Minum ramuan pemulih darah HP" },
           {
-            cmd: "pakai",
+            cmd: "use",
             param: "<item>",
             desc: "Gunakan ramuan / item pendukung",
           },
