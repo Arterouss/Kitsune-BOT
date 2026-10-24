@@ -1551,7 +1551,7 @@ ${rewardSummary.join('\n\n')}
     // 19. STATUS DATABASE & PENYIMPANAN DATA (.dbstatus / .cekdb)
     // ──────────────────────────────────────────────────────────
     if (['dbstatus', 'cekdb'].includes(command)) {
-      const status = getDatabaseStatus();
+      const status = await getDatabaseStatus(true);
 
       let text = `
 ╭━━━━━「 💾 *STATUS DATABASE BOT* 」━━━━━╮
@@ -1565,9 +1565,26 @@ ${rewardSummary.join('\n\n')}
 Semua progres level, koin, perlengkapan, dan inventori pemain tersimpan otomatis secara real-time di *MongoDB Atlas*.
 Data kamu *100% AMAN* dan tidak akan terhapus meski bot di-restart atau di-deploy ulang di Render!`;
       } else if (status.hasMongoUri) {
-        text += `\n\n⚠️ *KONEKSI GAGAL TERHUBUNG!*
-URI MongoDB terdeteksi, namun bot gagal tersambung ke cluster.
-Silakan periksa apakah IP Access List di MongoDB Atlas sudah diatur ke \`0.0.0.0/0\` (Allow Anywhere).`;
+        text += `\n\n⚠️ *KONEKSI GAGAL TERHUBUNG!*`;
+        if (status.lastError) {
+          text += `\n🔍 *Detail Error:* \`${status.lastError}\``;
+        }
+
+        if (status.hasBracketWarning) {
+          text += `\n\n🚨 *PENYEBAB UTAMA:*
+Terdapat tanda kurung siku \`< >\` pada connection string MongoDB Anda!
+❌ Salah: \`mongodb+srv://admin:<password>@cluster...\`
+✅ Benar: \`mongodb+srv://admin:password@cluster...\`
+👉 Harap hapus tanda kurung \`< \` dan \` >\` di Environment Variable Render Anda.`;
+        } else {
+          text += `\n\n📋 *Langkah Pemeriksaan:*
+1. **Password Mengandung Simbol Khusus?**
+   Jika password ada simbol \`@\`, \`#\`, \`:\`, ubah password di tab *Database Access* MongoDB menjadi kombinasi huruf & angka sederhana saja (contoh: \`Kitsune123\`).
+2. **Akun Database User Sudah Ada?**
+   Pastikan Anda membuat user di tab **Database Access** (bukan email login website MongoDB).
+3. **Role Akses User:**
+   Pastikan di tab Database Access, role user disetel ke *Built-in Role: Read and write to any database*.`;
+        }
       } else {
         text += `\n\n⚠️ *PERINGATAN PENYIMPANAN LOKAL:*
 Data saat ini tersimpan di file lokal (*database/rpg_database.json*).
