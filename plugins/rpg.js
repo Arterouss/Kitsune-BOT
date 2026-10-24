@@ -639,15 +639,14 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.
         }).join('\n\n');
 
         return reply(`
-╭━━━━━「 🔨 *BENGKEL TEMPA SENJATA* 」━━━━━╮
-┃ Gabungkan material alam menjadi senjata & perlengkapan perang tingkat tinggi!
+╭━━━━━「 🔨 *BENGKEL TEMPA* 」━━━━━╮
+┃ Buat senjata & zirah dari bahan tambang
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 ${recipeList}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ketik *${prefix}craft <id_resep>* untuk menempa.
-Contoh: *${prefix}craft pedang_besi*
+Ketik: *${prefix}craft <id_resep>* (Contoh: *${prefix}craft pedang_besi*)
 `.trim());
       }
 
@@ -692,11 +691,9 @@ Contoh: *${prefix}craft pedang_besi*
 
       saveRpgDb();
       return reply(`
-🎉 *BERHASIL MENEMPA PERLENGKAPAN BARU!*
-🔨 Kamu berhasil menciptakan: *${recipe.name}*!
-
-✨ Perlengkapan telah otomatis dipasang ke karaktermu!
-Cek status tempur barumu di *${prefix}profile*.
+🔨 *TEMPA BERHASIL!*
+Berhasil membuat *${recipe.name}*!
+✨ Perlengkapan sudah masuk ke lemarimu dan langsung dipasang.
 `.trim());
     }
 
