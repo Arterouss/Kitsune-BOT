@@ -84,6 +84,11 @@ export default {
             desc: "Jual perlengkapan bekas (50% refund)",
           },
           { cmd: "heal", param: "", desc: "Minum ramuan pemulih darah HP" },
+          {
+            cmd: "pakai",
+            param: "<item>",
+            desc: "Gunakan ramuan / item pendukung",
+          },
           { cmd: "daily", param: "", desc: "Klaim hadiah koin harian gratis" },
           { cmd: "shop", param: "", desc: "Toko gear (Bronze s/d Eternal)" },
           {

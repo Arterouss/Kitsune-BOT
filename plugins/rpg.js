@@ -44,6 +44,7 @@ export default {
     'adventure', 'petualang', 'adv',
     'mining', 'nambang', 'mine',
     'heal', 'obat',
+    'use', 'pakai', 'minum',
     'daily', 'klaim',
     'shop', 'toko',
     'buy', 'beli',
@@ -113,9 +114,14 @@ export default {
 ┃  • Bijih Emas: ${formatNumber(inv.emas)}
 ┃  • Berlian Murni: ${formatNumber(inv.berlian)}
 ┃
-┃ 🧪 *Ramuan & Konsumsi:*
+┃ 🧪 *Ramuan & Item Pendukung:*
 ┃  • Ramuan HP (+60): ${formatNumber(inv.potion_hp)} buah
-┃  • Minuman Stamina (+60): ${formatNumber(inv.potion_stamina)} buah
+┃  • Ramuan HP Besar (+160): ${formatNumber(inv.potion_hp_besar)} buah
+┃  • Ramuan Stamina (+60): ${formatNumber(inv.potion_stamina)} buah
+┃  • Ramuan Stamina Besar (+120): ${formatNumber(inv.potion_stamina_besar)} buah
+┃  • Kitab Pengalaman (+250 EXP): ${formatNumber(inv.kitab_exp)} buku
+┃  • Jimat Pelindung (Anti Kalah): ${formatNumber(inv.jimat_pelindung)} buah
+┃  • Tiket Boss Raid: ${formatNumber(inv.tiket_raid)} tiket
 ┃
 ┃ ⚔️ *Perlengkapan Terpasang:*
 ┃  • ${user.equipment.weapon} (+${user.equipment.weaponAtk} ATK)
@@ -124,9 +130,10 @@ export default {
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 💡 *Menu Interaksi:*
-• Ketik *${prefix}jual <nama/all>* untuk jual hasil ke toko.
-• Ketik *${prefix}craft* untuk membuat senjata & zirah baru.
-• Ketik *${prefix}heal* untuk minum ramuan pemulih HP.
+• Ketik *${prefix}pakai <item>* untuk memakai item pendukung.
+• Ketik *${prefix}jual <nama/all>* untuk jual hasil tambang ke toko.
+• Ketik *${prefix}craft* untuk membuka bengkel tempa perlengkapan.
+• Ketik *${prefix}shop* untuk membeli ramuan & perlengkapan baru.
 `.trim();
 
       return reply(text);
@@ -307,6 +314,23 @@ Kamu melawan *${monster.name}* dan berhasil menang!
         return reply(text);
       } else {
         // Kalah / Melarikan diri
+        if ((user.inventory.jimat_pelindung || 0) > 0) {
+          user.inventory.jimat_pelindung -= 1;
+          user.stats.timesDefeated += 1;
+          const consExp = 25;
+          addExp(user, consExp);
+          saveRpgDb();
+
+          return reply(`
+🧿 *JIMAT PELINDUNG BERSINAR!*
+Kamu terpojok oleh monster *${monster.name}*, namun Jimat Pelindung di tasmu pecah menjadi perisai cahaya gaib!
+✨ Semua luka fatal tertahan! Darahmu tetap aman (*${user.hp}/${user.maxHp} HP*).
+⚡ Stamina: -20 (Sisa: ${user.stamina}/${user.maxStamina})
+📈 EXP Hiburan: +${consExp} EXP
+📦 Sisa Jimat Pelindung: ${user.inventory.jimat_pelindung} buah
+`.trim());
+        }
+
         const severeDmg = Math.min(user.hp - 1, rawDmg + 15);
         user.hp = Math.max(1, user.hp - severeDmg);
         user.stats.timesDefeated += 1;
@@ -322,7 +346,7 @@ Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkanny
 ⚡ Stamina: -20
 📈 EXP Hiburan: +${consExp} EXP
 
-💡 _Gunakan *${prefix}heal* untuk memulihkan darah._
+💡 _Gunakan *${prefix}heal* untuk memulihkan darah atau beli *${prefix}shop* Jimat Pelindung._
 `.trim());
       }
     }
@@ -393,18 +417,189 @@ Kamu mengayunkan *${user.equipment.pickaxe}* ke dinding batu gua yang dalam...
         return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)! Tidak perlu minum obat.`);
       }
 
-      if ((user.inventory.potion_hp || 0) <= 0) {
-        return reply(`❌ Kamu tidak memiliki *Ramuan HP* di tas!\nBeli ramuan di *${prefix}shop* atau istirahat sejenak (HP pulih otomatis 1 poin tiap 45 detik).`);
+      const wantsBig = args && (args.toLowerCase().includes('besar') || args.toLowerCase().includes('large'));
+
+      if (wantsBig) {
+        if ((user.inventory.potion_hp_besar || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Ramuan HP Besar* di tas!\nBeli di *${prefix}shop* atau minum ramuan biasa dengan *${prefix}heal*.`);
+        }
+        user.inventory.potion_hp_besar -= 1;
+        const healAmount = 160;
+        const oldHp = user.hp;
+        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        const recovered = user.hp - oldHp;
+        saveRpgDb();
+        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
       }
 
-      user.inventory.potion_hp -= 1;
-      const healAmount = 60;
-      const oldHp = user.hp;
-      user.hp = Math.min(user.maxHp, user.hp + healAmount);
-      const recovered = user.hp - oldHp;
+      if ((user.inventory.potion_hp || 0) > 0) {
+        user.inventory.potion_hp -= 1;
+        const healAmount = 60;
+        const oldHp = user.hp;
+        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        const recovered = user.hp - oldHp;
+        saveRpgDb();
+        return reply(`🧪 *SLURP~!* Kamu meminum Ramuan HP.\n❤️ Darah pulih +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan: ${user.inventory.potion_hp})`);
+      } else if ((user.inventory.potion_hp_besar || 0) > 0) {
+        user.inventory.potion_hp_besar -= 1;
+        const healAmount = 160;
+        const oldHp = user.hp;
+        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        const recovered = user.hp - oldHp;
+        saveRpgDb();
+        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
+      } else {
+        return reply(`❌ Kamu tidak memiliki *Ramuan HP* di tas!\nBeli ramuan di *${prefix}shop* atau istirahat sejenak (HP pulih otomatis 1 poin tiap 45 detik).`);
+      }
+    }
 
-      saveRpgDb();
-      return reply(`🧪 *SLURP~!* Kamu meminum Ramuan HP.\n❤️ Darah pulih +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan: ${user.inventory.potion_hp})`);
+    // ──────────────────────────────────────────────────────────
+    // 5B. MENGGUNAKAN ITEM PENDUKUNG (.use / .pakai / .minum)
+    // ──────────────────────────────────────────────────────────
+    if (['use', 'pakai', 'minum'].includes(command)) {
+      if (!args) {
+        return reply(`
+🎒 *PENGGUNAAN ITEM PENDUKUNG:*
+Ketik: *${prefix}pakai <nama_item>*
+
+📋 *Daftar Item yang Bisa Dipakai:*
+• \`${prefix}pakai potion_hp\` ─ Minum Ramuan HP (+60 HP)
+• \`${prefix}pakai potion_hp_besar\` ─ Minum Ramuan HP Besar (+160 HP)
+• \`${prefix}pakai potion_stamina\` ─ Minum Ramuan Stamina (+60 Stamina)
+• \`${prefix}pakai potion_stamina_besar\` ─ Minum Ramuan Stamina Besar (+120 Stamina)
+• \`${prefix}pakai kitab_exp\` ─ Membaca Kitab Pengalaman (+250 EXP)
+• \`${prefix}pakai tiket_raid\` ─ Reset Cooldown World Boss grup
+• \`${prefix}pakai jimat_pelindung\` ─ Cek status perlindungan jimat
+`.trim());
+      }
+
+      const itemKey = args.trim().toLowerCase().replace(/\s+/g, '_');
+
+      // 1. Ramuan HP Biasa
+      if (['potion_hp', 'hp', 'darah'].includes(itemKey)) {
+        if (user.hp >= user.maxHp) {
+          return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)!`);
+        }
+        if ((user.inventory.potion_hp || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Ramuan HP* di tas! Beli di *${prefix}shop*.`);
+        }
+        user.inventory.potion_hp -= 1;
+        const healAmount = 60;
+        const oldHp = user.hp;
+        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        saveRpgDb();
+        return reply(`🧪 *SLURP~!* Kamu meminum Ramuan HP.\n❤️ Darah pulih +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp}).`);
+      }
+
+      // 2. Ramuan HP Besar
+      if (['potion_hp_besar', 'hp_besar', 'darah_besar'].includes(itemKey)) {
+        if (user.hp >= user.maxHp) {
+          return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)!`);
+        }
+        if ((user.inventory.potion_hp_besar || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Ramuan HP Besar* di tas! Beli di *${prefix}shop*.`);
+        }
+        user.inventory.potion_hp_besar -= 1;
+        const healAmount = 160;
+        const oldHp = user.hp;
+        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        saveRpgDb();
+        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp_besar}).`);
+      }
+
+      // 3. Ramuan Stamina Biasa
+      if (['potion_stamina', 'stamina', 'energi'].includes(itemKey)) {
+        if (user.stamina >= user.maxStamina) {
+          return reply(`⚡ Staminamu sudah penuh (${user.stamina}/${user.maxStamina})!`);
+        }
+        if ((user.inventory.potion_stamina || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Ramuan Stamina* di tas! Beli di *${prefix}shop*.`);
+        }
+        user.inventory.potion_stamina -= 1;
+        const restoreAmount = 60;
+        const oldStamina = user.stamina;
+        user.stamina = Math.min(user.maxStamina, user.stamina + restoreAmount);
+        saveRpgDb();
+        return reply(`⚡ *GLEK GLEK~!* Kamu meminum Ramuan Stamina.\n⚡ Stamina pulih +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina}).`);
+      }
+
+      // 4. Ramuan Stamina Besar
+      if (['potion_stamina_besar', 'stamina_besar'].includes(itemKey)) {
+        if (user.stamina >= user.maxStamina) {
+          return reply(`⚡ Staminamu sudah penuh (${user.stamina}/${user.maxStamina})!`);
+        }
+        if ((user.inventory.potion_stamina_besar || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Ramuan Stamina Besar* di tas! Beli di *${prefix}shop*.`);
+        }
+        user.inventory.potion_stamina_besar -= 1;
+        const restoreAmount = 120;
+        const oldStamina = user.stamina;
+        user.stamina = Math.min(user.maxStamina, user.stamina + restoreAmount);
+        saveRpgDb();
+        return reply(`⚡ *GLEK GLEK~!* Kamu meminum Ramuan Stamina Besar!\n⚡ Stamina terisi penuh +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina_besar}).`);
+      }
+
+      // 5. Kitab Pengalaman
+      if (['kitab_exp', 'kitab', 'exp_book', 'buku_exp'].includes(itemKey)) {
+        if ((user.inventory.kitab_exp || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Kitab Pengalaman* di tas! Beli di *${prefix}shop*.`);
+        }
+        user.inventory.kitab_exp -= 1;
+        const expGain = 250;
+        const lvlRes = addExp(user, expGain);
+        saveRpgDb();
+
+        let expText = `📖 *KITAB PENGALAMAN DIBACA!*
+Cahaya kebijaksanaan merasuki pikiranmu!
+📈 Mendapatkan: *+${expGain} EXP*!
+📊 EXP Sekarang: *${user.exp}/${user.maxExp}* (Sisa Kitab: ${user.inventory.kitab_exp})`;
+
+        if (lvlRes.leveledUp) {
+          expText += `\n\n🎉 *LEVEL UP!* Kamu naik ke *Level ${lvlRes.newLevel}*!\n⭐ Gelar: *${user.title}*\n❤️ HP & Stamina meningkat penuh!`;
+        }
+
+        return reply(expText);
+      }
+
+      // 6. Tiket Raid
+      if (['tiket_raid', 'tiket', 'raid_ticket'].includes(itemKey)) {
+        if (!isGroup) {
+          return reply(`⚠️ Tiket Raid hanya dapat digunakan di dalam grup yang memiliki cooldown World Boss!`);
+        }
+        if ((user.inventory.tiket_raid || 0) <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Tiket Raid* di tas! Beli di *${prefix}shop*.`);
+        }
+
+        const activeRaid = global.rpgRaids[jid];
+        if (activeRaid) {
+          return reply(`⚠️ Sedang ada boss raid yang aktif (*${activeRaid.name}*) di grup ini! Serang boss dengan *${prefix}serang*.`);
+        }
+
+        const lastRaid = global.rpgRaidCooldowns[jid] || 0;
+        const raidCooldown = 600000;
+        if (now - lastRaid >= raidCooldown) {
+          return reply(`🛡️ Cooldown raid grup sudah selesai! Kamu bisa langsung mengetik *${prefix}raid* tanpa perlu memakai tiket.`);
+        }
+
+        user.inventory.tiket_raid -= 1;
+        global.rpgRaidCooldowns[jid] = 0;
+        saveRpgDb();
+
+        return reply(`🎫 *TIKET RAID BERHASIL DIGUNAKAN!*
+👤 *${user.name}* telah mereset cooldown World Boss di grup ini!
+🔥 Boss Raid kini bisa langsung dipanggil kembali!
+👉 Ketik *${prefix}raid* untuk memanggil monster raksasa!`);
+      }
+
+      // 7. Jimat Pelindung
+      if (['jimat_pelindung', 'jimat'].includes(itemKey)) {
+        return reply(`🧿 *INFO PENGGUNAAN JIMAT PELINDUNG:*
+Jimat Pelindung bekerja secara *otomatis dan pasif* dari dalam tasmu saat bertualang (*${prefix}adventure*).
+Jika kamu kalah saat bertarung, jimat ini akan otomatis pecah melindungi nyawamu sehingga darahmu (HP) tidak berkurang parah!
+📦 Koleksimu saat ini: *${user.inventory.jimat_pelindung || 0} buah*.`);
+      }
+
+      return reply(`❌ Item *"${args}"* tidak dikenali atau tidak bisa dipakai!\nKetik *${prefix}pakai* untuk melihat panduan item.`);
     }
 
     // ──────────────────────────────────────────────────────────
@@ -464,7 +659,7 @@ Terima kasih sudah setia berpetualang bersama Kitsune Bot!
 ┃ 👤 *Koin Kamu:* ${formatNumber(user.money)} Gold
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🧪 *RAMUAN & KONSUMSI:*
+🧪 *RAMUAN & ITEM PENDUKUNG:*
 ${consumables.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
 
 🗡️ *SENJATA (PEDANG TIER 1 - 5):*
@@ -477,8 +672,9 @@ ${armors.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.nam
 ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.name} (${i.desc})_`).join('\n')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *Beli:* \`${prefix}beli <id> <jumlah>\` (Contoh: \`${prefix}beli pedang_iron\`)
-💡 *Cek Lemari:* \`${prefix}lemari\` | *Ganti:* \`${prefix}equip <id>\` | *Jual:* \`${prefix}jualeq <id>\`
+💡 *Beli:* \`${prefix}beli <id> <jumlah>\` (Contoh: \`${prefix}beli potion_hp 3\` atau \`${prefix}beli pedang_besi\`)
+💡 *Pakai Item:* \`${prefix}pakai <id>\` (Contoh: \`${prefix}pakai potion_hp\`)
+💡 *Koleksi:* \`${prefix}lemari\` | *Ganti:* \`${prefix}equip <id>\` | *Jual:* \`${prefix}jualeq <id>\`
 `.trim();
 
       return reply(text);
@@ -489,7 +685,7 @@ ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.n
     // ──────────────────────────────────────────────────────────
     if (['buy', 'beli'].includes(command)) {
       if (!args) {
-        return reply(`⚠️ Masukkan ID item yang ingin dibeli!\nContoh: *${prefix}beli pedang_bronze* atau *${prefix}beli potion_hp 2*\nKetik *${prefix}shop* untuk melihat katalog barang.`);
+        return reply(`⚠️ Masukkan ID item yang ingin dibeli!\nContoh: *${prefix}beli pedang_besi* atau *${prefix}beli potion_hp 2*\nKetik *${prefix}shop* untuk melihat katalog barang.`);
       }
 
       const parts = args.split(' ');
@@ -507,7 +703,7 @@ ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.n
         return reply(`❌ Item tidak ditemukan! Ketik *${prefix}shop* untuk melihat barang yang dijual.`);
       }
 
-      // Pembelian Ramuan / Konsumsi
+      // Pembelian Ramuan & Item Pendukung
       if (targetItem.type === 'consumable') {
         const totalPrice = targetItem.price * count;
         if (user.money < totalPrice) {
@@ -515,14 +711,10 @@ ${pickaxes.map(i => `  • \`${i.id}\` : *${formatNumber(i.price)} G* ─ _${i.n
         }
 
         user.money -= totalPrice;
-        if (targetItem.id === 'potion_hp') {
-          user.inventory.potion_hp = (user.inventory.potion_hp || 0) + count;
-        } else if (targetItem.id === 'potion_stamina') {
-          user.inventory.potion_stamina = (user.inventory.potion_stamina || 0) + count;
-        }
+        user.inventory[targetItem.id] = (user.inventory[targetItem.id] || 0) + count;
 
         saveRpgDb();
-        return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.`);
+        return reply(`✅ Berhasil membeli *${count}x ${targetItem.name}* seharga *${formatNumber(totalPrice)} Gold*!\nSisa saldo: *${formatNumber(user.money)} Gold*.\n💡 Cek tasmu di *${prefix}inv* atau ketik *${prefix}pakai ${targetItem.id}* untuk memakainya.`);
       }
 
       // Pembelian Perlengkapan (Senjata / Zirah / Beliung)
@@ -634,19 +826,23 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.
     if (['craft', 'tempa'].includes(command)) {
       if (!args) {
         let recipeList = CRAFT_RECIPES.map((r, i) => {
+          const isUnlocked = user.level >= (r.minLv || 1);
+          const statusBadge = isUnlocked ? '✅' : `🔒 Min Lv. ${r.minLv}`;
           const reqs = Object.entries(r.cost).map(([k, v]) => `${v} ${k}`).join(', ');
-          return `*${i + 1}. ${r.name}*\n   📝 _${r.desc}_\n   🔨 Bahan: *${reqs}*\n   ⚡ Cara Buat: \`${prefix}craft ${r.id}\``;
+          return `*${i + 1}. [${statusBadge}] ${r.name}* (\`${r.id}\`)\n   📝 _${r.desc}_\n   🔨 Bahan: *${reqs}*\n   ⚡ Tempa: \`${prefix}craft ${r.id}\``;
         }).join('\n\n');
 
         return reply(`
-╭━━━━━「 🔨 *BENGKEL TEMPA* 」━━━━━╮
-┃ Buat senjata & zirah dari bahan tambang
+╭━━━━━「 🔨 *BENGKEL TEMPA PERLENGKAPAN* 」━━━━━╮
+┃ 👤 *Level Petualang:* Lv. ${user.level} (${user.title})
+┃ Tempa senjata & zirah tempur sesuai tingkat level!
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 ${recipeList}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ketik: *${prefix}craft <id_resep>* (Contoh: *${prefix}craft pedang_besi*)
+💡 *Cara Tempa:* \`${prefix}craft <id_resep>\` (Contoh: \`${prefix}craft pedang_besi\`)
+🔒 Item bertanda 🔒 butuh level lebih tinggi untuk dibuka.
 `.trim());
       }
 
@@ -656,9 +852,18 @@ Ketik: *${prefix}craft <id_resep>* (Contoh: *${prefix}craft pedang_besi*)
         return reply(`❌ Resep tempa tidak ditemukan! Ketik *${prefix}craft* untuk melihat resep yang tersedia.`);
       }
 
+      // Cek Persyaratan Level (minLv)
+      if (recipe.minLv && user.level < recipe.minLv) {
+        return reply(`🔒 *LEVEL BELUM MENCUKUPI!*
+Untuk menempa *${recipe.name}*, kamu minimal harus mencapai *Level ${recipe.minLv}*!
+Levelmu saat ini: *Lv. ${user.level}* (Kurang ${recipe.minLv - user.level} Level).
+
+💡 Selesaikan *${prefix}adventure* atau kalahkan monster di *${prefix}raid* untuk menaikkan level!`);
+      }
+
       // Cek koin
       if (recipe.cost.koin && user.money < recipe.cost.koin) {
-        return reply(`💸 Koin tidak cukup! Butuh *${formatNumber(recipe.cost.koin)} Gold*.`);
+        return reply(`💸 Koin tidak cukup! Butuh *${formatNumber(recipe.cost.koin)} Gold* (Koinmu: ${formatNumber(user.money)}).`);
       }
 
       // Cek bahan material
@@ -694,6 +899,7 @@ Ketik: *${prefix}craft <id_resep>* (Contoh: *${prefix}craft pedang_besi*)
 🔨 *TEMPA BERHASIL!*
 Berhasil membuat *${recipe.name}*!
 ✨ Perlengkapan sudah masuk ke lemarimu dan langsung dipasang.
+📊 Cek status terbarumu di *${prefix}profile*.
 `.trim());
     }
 
