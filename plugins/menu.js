@@ -109,18 +109,6 @@ export default {
         ],
       },
       {
-        category: "🔞 NSFW (18+)",
-        items: [
-          { cmd: "nsfwwaifu", param: "", desc: "Random waifu NSFW" },
-          { cmd: "nsfwneko", param: "", desc: "Random neko girl NSFW" },
-          { cmd: "trap", param: "", desc: "Random trap" },
-          { cmd: "blowjob", param: "", desc: "Random blowjob" },
-          { cmd: "hentai", param: "", desc: "Random hentai pic" },
-          { cmd: "nsfwgif", param: "", desc: "Random NSFW GIF" },
-          { cmd: "doujin", param: "<judul>", desc: "Cari doujin (nhentai)" },
-        ],
-      },
-      {
         category: "🎮 GAME",
         items: [
           { cmd: "susunkata", param: "", desc: "Tebak susun kata acak" },
