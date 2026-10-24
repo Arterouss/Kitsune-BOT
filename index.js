@@ -6,10 +6,14 @@ import readline from 'readline';
 import qrcode from 'qrcode-terminal';
 import { config } from './config.js';
 import { messageHandler } from './handler.js';
+import { initMongo } from './lib/rpg.js';
 
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+
+// Inisialisasi Database Cloud MongoDB Atlas jika tersedia di Environment
+initMongo().catch(() => {});
 
 // Pulihkan sesi WhatsApp dari Environment Variable jika tersedia di Cloud (Render)
 if (process.env.SESSION_DATA) {

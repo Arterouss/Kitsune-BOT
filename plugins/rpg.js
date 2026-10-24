@@ -13,7 +13,8 @@ import {
   addToArmory,
   equipFromArmory,
   sellFromArmory,
-  rollGacha
+  rollGacha,
+  getDatabaseStatus
 } from '../lib/rpg.js';
 
 // Global memory state for active group duels & boss raids
@@ -55,7 +56,8 @@ export default {
     'leaderboard', 'top', 'lb',
     'transfer', 'pay',
     'duel', 'pvp', 'terima', 'terimaduel', 'gas', 'tolak', 'tolakduel',
-    'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi', 'tagraid', 'ajakraid'
+    'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi', 'tagraid', 'ajakraid',
+    'dbstatus', 'cekdb'
   ],
   category: 'rpg',
   description: 'Sistem Petualangan RPG, Leveling, Mining, Toko, Duel PvP, dan Boss Raid',
@@ -1543,6 +1545,41 @@ ${rewardSummary.join('\n\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌟 _Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
 `.trim());
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 19. STATUS DATABASE & PENYIMPANAN DATA (.dbstatus / .cekdb)
+    // ──────────────────────────────────────────────────────────
+    if (['dbstatus', 'cekdb'].includes(command)) {
+      const status = getDatabaseStatus();
+
+      let text = `
+╭━━━━━「 💾 *STATUS DATABASE BOT* 」━━━━━╮
+┃ 📂 *Tipe:* ${status.storageType}
+┃ 👥 *Pemain Terdaftar:* ${status.userCount} Orang
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+`.trim();
+
+      if (status.isMongoConnected) {
+        text += `\n\n✅ *CLOUD DATABASE AKTIF!*
+Semua progres level, koin, perlengkapan, dan inventori pemain tersimpan otomatis secara real-time di *MongoDB Atlas*.
+Data kamu *100% AMAN* dan tidak akan terhapus meski bot di-restart atau di-deploy ulang di Render!`;
+      } else if (status.hasMongoUri) {
+        text += `\n\n⚠️ *KONEKSI GAGAL TERHUBUNG!*
+URI MongoDB terdeteksi, namun bot gagal tersambung ke cluster.
+Silakan periksa apakah IP Access List di MongoDB Atlas sudah diatur ke \`0.0.0.0/0\` (Allow Anywhere).`;
+      } else {
+        text += `\n\n⚠️ *PERINGATAN PENYIMPANAN LOKAL:*
+Data saat ini tersimpan di file lokal (*database/rpg_database.json*).
+Karena Render Free Tier bersifat _ephemeral_, data bisa ter-reset saat bot melakukan deploy ulang dari Git.
+
+💡 *Solusi Simpan Permanen (Gratis):*
+1. Buat database gratis di *mongodb.com/atlas*
+2. Salin connection string: \`mongodb+srv://...\`
+3. Masukkan ke *Environment Variables* di dashboard Render dengan Key: \`MONGODB_URI\`.`;
+      }
+
+      return reply(text);
     }
   }
 };
