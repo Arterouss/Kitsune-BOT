@@ -100,6 +100,7 @@ export default {
           },
           { cmd: "raid", param: "", desc: "World Boss Raid monster raksasa" },
           { cmd: "serang", param: "", desc: "Pukul Boss Raid bersama anggota" },
+          { cmd: "tagraid", param: "", desc: "Ajak/tag teman serang boss" },
         ],
       },
       {

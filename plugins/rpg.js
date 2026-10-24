@@ -52,7 +52,7 @@ export default {
     'leaderboard', 'top', 'lb',
     'transfer', 'pay',
     'duel', 'pvp', 'terima', 'terimaduel', 'gas', 'tolak', 'tolakduel',
-    'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi'
+    'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi', 'tagraid', 'ajakraid'
   ],
   category: 'rpg',
   description: 'Sistem Petualangan RPG, Leveling, Mining, Toko, Duel PvP, dan Boss Raid',
@@ -1056,7 +1056,14 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
 
       const hpBar = renderBar(bossData.hp, bossData.hp, 10);
 
-      return reply(`
+      let mentions = [];
+      try {
+        const meta = await sock.groupMetadata(jid);
+        mentions = (meta.participants || []).map(p => p.id);
+      } catch {}
+
+      return await sock.sendMessage(jid, {
+        text: `
 🔥━━━━━「 🚨 *WORLD BOSS MUNCUL!* 🚨 」━━━━━🔥
 *${bossData.name}* telah muncul di grup ini!
 
@@ -1070,7 +1077,45 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
 • 💎 Berlian & Emas untuk penyerang teratas
 
 ⚔️ *Ayo serang bersama!* Ketik: *${prefix}serang*
-`.trim());
+📢 _Ajak teman grup:_ Ketik *${prefix}tagraid*
+`.trim(),
+        mentions
+      }, { quoted: msg });
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 16B. AJAK TEMAN SERANG BOSS (.tagraid / .ajakraid)
+    // ──────────────────────────────────────────────────────────
+    if (['tagraid', 'ajakraid'].includes(command)) {
+      if (!isGroup) return reply('⚠️ Perintah ini hanya bisa digunakan di dalam grup!');
+      const raid = global.rpgRaids[jid];
+      if (!raid) {
+        return reply(`⚠️ Tidak ada Boss Raid yang sedang berlangsung di grup ini!\nKetik *${prefix}raid* untuk memanggil boss.`);
+      }
+
+      let mentions = [];
+      try {
+        const meta = await sock.groupMetadata(jid);
+        mentions = (meta.participants || []).map(p => p.id);
+      } catch {}
+
+      const hpBar = renderBar(raid.hp, raid.maxHp, 10);
+      const persen = Math.round((raid.hp / raid.maxHp) * 100);
+      const sisaWaktu = formatDuration(Math.max(0, raid.expiresAt - now));
+
+      return await sock.sendMessage(jid, {
+        text: `
+🚨 *PANGGILAN PERANG WORLD BOSS RAID!* 🚨
+👤 *${user.name}* memanggil seluruh petualang di grup ini untuk membantu mengalahkan *${raid.name}*!
+
+❤️ *Sisa Darah Boss:* [${hpBar}] ${formatNumber(raid.hp)} / ${formatNumber(raid.maxHp)} HP (${persen}%)
+⏳ *Sisa Waktu:* ${sisaWaktu}
+
+⚔️ *Ayo serang sekarang bareng-bareng!*
+👉 Ketik *${prefix}serang* untuk memukul!
+`.trim(),
+        mentions
+      }, { quoted: msg });
     }
 
     // ──────────────────────────────────────────────────────────
