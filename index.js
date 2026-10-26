@@ -15,23 +15,30 @@ import path from 'path';
 // Inisialisasi Database Cloud MongoDB Atlas jika tersedia di Environment
 initMongo().catch(() => {});
 
+// Flag untuk menandai jika sesi lama di-logout sehingga tidak memulihkan sesi mati
+let sessionInvalidated = false;
+
 // Pulihkan sesi WhatsApp dari Environment Variable jika tersedia di Cloud (Render)
-if (process.env.SESSION_DATA) {
-  try {
-    const sessionDir = path.resolve('./session');
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
+function restoreSession() {
+  if (sessionInvalidated) return;
+  if (process.env.SESSION_DATA) {
+    try {
+      const sessionDir = path.resolve('./session');
+      if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+      }
+      const credsPath = path.join(sessionDir, 'creds.json');
+      if (!fs.existsSync(credsPath)) {
+        const decoded = Buffer.from(process.env.SESSION_DATA, 'base64').toString('utf-8');
+        fs.writeFileSync(credsPath, decoded);
+        console.log('🔑 [SESSION RESTORED] Berhasil memulihkan sesi login WhatsApp dari Environment Variable!');
+      }
+    } catch (err) {
+      console.error('Error saat memulihkan session dari SESSION_DATA:', err.message);
     }
-    const credsPath = path.join(sessionDir, 'creds.json');
-    if (!fs.existsSync(credsPath)) {
-      const decoded = Buffer.from(process.env.SESSION_DATA, 'base64').toString('utf-8');
-      fs.writeFileSync(credsPath, decoded);
-      console.log('🔑 [SESSION RESTORED] Berhasil memulihkan sesi login WhatsApp dari Environment Variable!');
-    }
-  } catch (err) {
-    console.error('Error saat memulihkan session dari SESSION_DATA:', err.message);
   }
 }
+restoreSession();
 
 // Pulihkan YouTube Cookies dari Environment Variable jika tersedia di Cloud (Render)
 if (process.env.YOUTUBE_COOKIES || process.env.COOKIES_DATA) {
@@ -117,7 +124,7 @@ async function startBot() {
 
   // 3. Login Menggunakan Pairing Code (Jika diaktifkan & belum login)
   if (config.usePairingCode && !sock.authState.creds.registered) {
-    let phoneNumber = config.phoneNumber;
+    let phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
 
     if (!phoneNumber) {
       console.log('\n[LOGIN PAIRING CODE]');
@@ -126,10 +133,13 @@ async function startBot() {
       phoneNumber = await question('👉 Masukkan Nomor WhatsApp: ');
     }
 
-    phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+    phoneNumber = (phoneNumber || '').replace(/[^0-9]/g, '');
 
-    setTimeout(async () => {
+    const requestPairing = async (retry = 0) => {
       try {
+        await new Promise(r => setTimeout(r, 4000));
+        if (sock.authState.creds.registered) return;
+        console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
         const code = await sock.requestPairingCode(phoneNumber);
         const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
         console.log('\n┌──────────────────────────────────────────────┐');
@@ -142,9 +152,16 @@ async function startBot() {
         console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
         console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
       } catch (err) {
-        console.error('Gagal mendapatkan kode pairing:', err);
+        if (retry < 5) {
+          console.log(`⏳ Menunggu socket WhatsApp siap (${err.message}). Mencoba lagi dalam 4 detik...`);
+          setTimeout(() => requestPairing(retry + 1), 4000);
+        } else {
+          console.error('❌ Gagal mendapatkan kode pairing:', err.message);
+        }
       }
-    }, 3000);
+    };
+
+    requestPairing();
   }
 
   // 4. Pantau Status Koneksi
@@ -161,20 +178,42 @@ async function startBot() {
         ? lastDisconnect.error.output.statusCode
         : null;
       
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`⚠️ Koneksi terputus (Alasan: ${lastDisconnect?.error?.message || statusCode}). Reconnect: ${shouldReconnect}`);
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      console.log(`⚠️ Koneksi terputus (Alasan: ${lastDisconnect?.error?.message || statusCode}). Reconnect: ${!isLoggedOut}`);
 
-      if (shouldReconnect) {
-        console.log('🔄 Menyambungkan ulang ke server WhatsApp...');
-        startBot();
+      if (isLoggedOut) {
+        console.log('❌ Sesi WhatsApp telah kedaluwarsa atau di-logout dari HP.');
+        console.log('🧹 Menghapus sesi lama dan membuat kode pairing baru...');
+        try {
+          fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
+        } catch {}
+        sessionInvalidated = true;
+        setTimeout(() => {
+          console.log('🔄 Memulai ulang bot untuk meminta kode pairing baru...');
+          startBot();
+        }, 3000);
       } else {
-        console.log('❌ Anda telah logout dari WhatsApp. Silakan hapus folder "session" dan mulai ulang.');
+        console.log('🔄 Menyambungkan ulang ke server WhatsApp...');
+        setTimeout(() => startBot(), 3000);
       }
     } else if (connection === 'open') {
       console.log('\n====================================================');
       console.log(`✅ BERHASIL TERHUBUNG! ${config.botName} siap digunakan.`);
       console.log(`📱 Coba kirim pesan ".menu" ke nomor bot.`);
       console.log('====================================================\n');
+
+      // Tampilkan base64 creds untuk memudahkan update SESSION_DATA di Render
+      try {
+        const credsPath = path.resolve('./session/creds.json');
+        if (fs.existsSync(credsPath)) {
+          const credsBase64 = Buffer.from(fs.readFileSync(credsPath)).toString('base64');
+          console.log('🔑 [KODE SESSION_DATA BARU UNTUK RENDER]:');
+          console.log('Simpan kode di bawah ini ke Environment Variable SESSION_DATA di Render agar sesi permanen:');
+          console.log('----------------------------------------------------');
+          console.log(credsBase64);
+          console.log('----------------------------------------------------\n');
+        }
+      } catch {}
     }
   });
 
