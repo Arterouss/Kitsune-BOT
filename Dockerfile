@@ -1,6 +1,7 @@
 FROM node:20-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PORT=8080
 
 # Install dependencies: ffmpeg, python3, curl, git, yt-dlp
 RUN apt-get update && \
@@ -10,8 +11,7 @@ RUN apt-get update && \
     curl \
     git \
     ca-certificates && \
-    curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp && \
+    (curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp || true) && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
