@@ -15,15 +15,22 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Setup non-root user required by Hugging Face Spaces
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PORT=7860
 
-# Copy package files
-COPY package*.json ./
+WORKDIR $HOME/app
+
+# Copy package files and install dependencies
+COPY --chown=user:user package*.json ./
 RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy app source
-COPY . .
+COPY --chown=user:user . .
 
-EXPOSE 8080
+EXPOSE 7860
 
 CMD ["node", "index.js"]
