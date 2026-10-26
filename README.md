@@ -1,12 +1,3 @@
----
-title: Kitsune Bot
-emoji: 🦊
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 7860
----
-
 # 🦊 Kitsune Bot - WhatsApp Multi-Feature (Modular Plugins & Anti-Blokir)
 
 > **Created by:** [Arterouss](https://github.com/Arterouss)  
