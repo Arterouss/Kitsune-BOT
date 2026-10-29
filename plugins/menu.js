@@ -157,6 +157,7 @@ export default {
             param: "<open/close>",
             desc: "Buka atau tutup izin obrolan",
           },
+          { cmd: "del", param: "", desc: "Hapus pesan yang di-reply/dikutip" },
         ],
       },
     ];

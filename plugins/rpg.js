@@ -257,11 +257,18 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
       const monster = eligibleMonsters[Math.floor(Math.random() * eligibleMonsters.length)] || MONSTERS[0];
 
       // Simulasi pertarungan
-      const playerAtk = (user.level * 8) + (user.equipment.weaponAtk || 5) + Math.floor(Math.random() * 20);
+      const weaponBonus = user.equipment.weaponAtk || 5;
+      const isPlayerCrit = Math.random() < 0.22;
+      const playerAtk = Math.floor(((user.level * 10) + weaponBonus + Math.floor(Math.random() * 25)) * (isPlayerCrit ? 1.5 : 1));
       const monsterHp = monster.baseHp;
 
       // Hitung damage monster ke pemain (dikurangi Armor DEF)
-      const rawDmg = Math.max(5, monster.atk + Math.floor(Math.random() * 10) - (user.equipment.armorDef || 2));
+      const isMonsterCrit = Math.random() < 0.22;
+      const monsterRoll = monster.atk + Math.floor(Math.random() * (monster.atk * 0.45));
+      const rawMonsterAtk = isMonsterCrit ? Math.floor(monsterRoll * 1.45) : monsterRoll;
+      const armorDef = user.equipment.armorDef || 2;
+      const mitigatedDmg = Math.max(Math.floor(rawMonsterAtk * 0.32), rawMonsterAtk - Math.floor(armorDef * 0.8));
+      const rawDmg = Math.max(10, Math.floor(mitigatedDmg + (Math.random() * 8) - 4));
       
       // Pemain menang jika attack cukup
       const isWin = playerAtk >= (monsterHp * 0.4);
@@ -310,6 +317,8 @@ Kamu melawan *${monster.name}* dan berhasil menang!
 • 💰 +${formatNumber(goldGained)} Koin
 • 📈 +${expGained} EXP
 • ${drops.join('\n• ')}
+
+💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat._
 `.trim();
 
         if (lvlResult.leveledUp) {
@@ -1311,29 +1320,50 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       // Ambil boss acak dari katalog
       const bossData = RAID_BOSSES[Math.floor(Math.random() * RAID_BOSSES.length)];
 
+      // Variasi acak trait gelar dan stat HP & ATK agar selalu berbeda-beda
+      const traits = [
+        { prefix: "🔥 [Beringas]", hpMult: 1.15, atkMult: 1.2, rewardMult: 1.2 },
+        { prefix: "⚡ [Murka]", hpMult: 1.1, atkMult: 1.3, rewardMult: 1.25 },
+        { prefix: "💀 [Terkutuk]", hpMult: 1.25, atkMult: 1.15, rewardMult: 1.2 },
+        { prefix: "👑 [Kuno]", hpMult: 1.3, atkMult: 1.2, rewardMult: 1.3 },
+        { prefix: "🌌 [Abyssal]", hpMult: 1.4, atkMult: 1.35, rewardMult: 1.4 },
+        { prefix: "🛡️ [Berdarah Besi]", hpMult: 1.35, atkMult: 1.05, rewardMult: 1.15 },
+        { prefix: "", hpMult: 1.0, atkMult: 1.0, rewardMult: 1.0 }
+      ];
+      const selectedTrait = traits[Math.floor(Math.random() * traits.length)];
+      const randomVariance = 0.92 + (Math.random() * 0.16); // 92% - 108%
+
+      const finalHp = Math.floor(bossData.hp * selectedTrait.hpMult * randomVariance);
+      const finalAtk = Math.floor(bossData.atk * selectedTrait.atkMult * randomVariance);
+      const finalGold = Math.floor(bossData.rewardGold * selectedTrait.rewardMult);
+      const finalExp = Math.floor(bossData.rewardExp * selectedTrait.rewardMult);
+      const bossFullName = selectedTrait.prefix ? `${selectedTrait.prefix} ${bossData.name}` : bossData.name;
+
       global.rpgRaids[jid] = {
         id: bossData.id,
-        name: bossData.name,
+        name: bossFullName,
+        rawName: bossData.name,
         title: bossData.title,
-        hp: bossData.hp,
-        maxHp: bossData.hp,
-        atk: bossData.atk,
-        rewardGold: bossData.rewardGold,
-        rewardExp: bossData.rewardExp,
+        hp: finalHp,
+        maxHp: finalHp,
+        atk: finalAtk,
+        skills: bossData.skills || ["Hantaman Brutal", "Cakaran Mematikan"],
+        rewardGold: finalGold,
+        rewardExp: finalExp,
         drops: bossData.drops,
         startedAt: now,
-        expiresAt: now + (15 * 60 * 1000), // 15 menit
+        expiresAt: now + (20 * 60 * 1000), // 20 menit per raid
         contributors: {},
         timer: setTimeout(() => {
           if (global.rpgRaids[jid]) {
-            reply(`⏳ *WAKTU HABIS!* ${bossData.name} tertawa congkak dan melarikan diri ke sarangnya!\nAnggota grup gagal menaklukkan boss raid.`);
+            reply(`⏳ *WAKTU HABIS!* ${bossFullName} meraung congkak dan melarikan diri ke sarangnya!\nAnggota grup gagal menaklukkan boss raid.`);
             global.rpgRaidCooldowns[jid] = Date.now();
             delete global.rpgRaids[jid];
           }
-        }, 15 * 60 * 1000)
+        }, 20 * 60 * 1000)
       };
 
-      const hpBar = renderBar(bossData.hp, bossData.hp, 10);
+      const hpBar = renderBar(finalHp, finalHp, 10);
 
       let mentions = [];
       try {
@@ -1344,19 +1374,22 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       return await sock.sendMessage(jid, {
         text: `
 🔥━━━━━「 🚨 *WORLD BOSS MUNCUL!* 🚨 」━━━━━🔥
-*${bossData.name}* telah muncul di grup ini!
+*${bossFullName}* telah menginvasi grup ini!
 
-👹 *Nama:* ${bossData.name}
-❤️ *HP Total:* [${hpBar}] ${formatNumber(bossData.hp)} HP
-⏱️ *Batas Waktu:* 15 Menit
+👹 *Monster:* ${bossFullName}
+📜 *Pangkat:* ${bossData.title}
+❤️ *HP Total:* [${hpBar}] ${formatNumber(finalHp)} HP
+⚔️ *Daya Serang:* ~${finalAtk} ATK
+⏱️ *Batas Waktu:* 20 Menit
 
-🎁 *Total Hadiah:*
-• 💰 ${formatNumber(bossData.rewardGold)} Koin
-• 📈 ${formatNumber(bossData.rewardExp)} EXP
-• 💎 Berlian & Emas untuk penyerang teratas
+🎁 *Total Hadiah Kemenangan:*
+• 💰 ${formatNumber(finalGold)} Koin
+• 📈 ${formatNumber(finalExp)} EXP
+• 💎 Berlian, Emas, & Besi untuk penyerang teratas!
 
 ⚔️ *Ayo serang bersama!* Ketik: *${prefix}serang*
 📢 _Ajak teman grup:_ Ketik *${prefix}tagraid*
+💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat._
 `.trim(),
         mentions
       }, { quoted: msg });
@@ -1425,13 +1458,25 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       // Kurangi stamina
       user.stamina -= 10;
 
-      // Hitung damage pemain ke boss
+      // 1. Hitung damage pemain ke boss (skala Senjata & Critical Hit)
       const weaponBonus = user.equipment.weaponAtk || 5;
-      const playerDmg = Math.floor((user.level * 9) + weaponBonus + (Math.random() * 35)) + 25;
+      const isPlayerCrit = Math.random() < 0.25; // 25% peluang Critical Hit
+      const critMultiplier = isPlayerCrit ? (1.75 + (Math.random() * 0.5)) : 1.0;
+      const basePlayerDmg = (user.level * 22) + (weaponBonus * 2.2) + Math.floor(Math.random() * 50) + 40;
+      const playerDmg = Math.floor(basePlayerDmg * critMultiplier);
 
-      // Serangan balik boss ke pemain (dikurangi zirah)
+      // 2. Serangan balik boss ke pemain (dengan variasi skill boss & zirah)
+      const skills = raid.skills || ["Hantaman Mematikan", "Cakaran Badai", "Guncangan Gempa"];
+      const skillName = skills[Math.floor(Math.random() * skills.length)];
+      
+      const isBossCrit = Math.random() < 0.22; // 22% serangan kuat boss
+      const bossMult = isBossCrit ? (1.4 + (Math.random() * 0.4)) : (0.85 + (Math.random() * 0.35));
+      const rawBossAtk = Math.floor(raid.atk * bossMult);
       const armorBonus = user.equipment.armorDef || 2;
-      const counterDmg = Math.max(5, Math.floor((raid.atk * 0.35) + (Math.random() * 10)) - armorBonus);
+      
+      // Zirah meredam serangan, namun tetap ada chip damage proporsional (tidak pernah konstan 5)
+      const mitigatedDmg = Math.max(Math.floor(rawBossAtk * 0.32), rawBossAtk - Math.floor(armorBonus * 0.8));
+      const counterDmg = Math.max(15, Math.floor(mitigatedDmg + (Math.random() * 12) - 6));
       user.hp = Math.max(1, user.hp - counterDmg);
 
       // Catat kontribusi
@@ -1458,17 +1503,33 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
         const hpBar = renderBar(raid.hp, raid.maxHp, 10);
         const persen = Math.round((raid.hp / raid.maxHp) * 100);
 
+        const playerAttackHeadline = isPlayerCrit 
+          ? `⚔️💥 *CRITICAL HIT!* Serangan dahsyat menembus titik lemah boss!` 
+          : `💥 *SERANGAN TELAK MENGHANTAM!*`;
+
+        const bossCounterHeadline = isBossCrit
+          ? `⚡ *SKILL KHUSUS BOSS:* ${raid.name} melepaskan *"${skillName}"*!`
+          : `💢 *Serangan Balik:* ${raid.name} membalas dengan *"${skillName}"*!`;
+
+        let warningHp = '';
+        if (user.hp <= 25) {
+          warningHp = `\n⚠️ *PERINGATAN:* Darahmu sekarat! Segera gunakan *${prefix}use potion_hp* sebelum menyerang kembali!`;
+        }
+
         return reply(`
-💥 *SERANGAN TELAK MENGHANTAM!*
-👤 *${user.name}* mengayunkan *${user.equipment.weapon}*!
-🗡️ Damage Dihasilkan: *-${formatNumber(playerDmg)} HP*
-💔 Serangan Balik Boss: -${counterDmg} HP (Darahmu: ${user.hp}/${user.maxHp})
-⚡ Sisa Stamina: ${user.stamina}/${user.maxStamina}
+${playerAttackHeadline}
+👤 *${user.name}* menghunus *${user.equipment.weapon}*!
+🗡️ Damage Dihasilkan: *-${formatNumber(playerDmg)} HP* ${isPlayerCrit ? '*(CRIT! 🔥)*' : ''}
+
+${bossCounterHeadline}
+💔 Luka Diterima: *-${formatNumber(counterDmg)} HP* (Darahmu: ${user.hp}/${user.maxHp})
+⚡ Sisa Stamina: ${user.stamina}/${user.maxStamina}${warningHp}
 
 👹 *Kondisi ${raid.name}:*
 [${hpBar}] ${formatNumber(raid.hp)} / ${formatNumber(raid.maxHp)} HP (${persen}%)
 
 🔥 _Ayo serang lagi ketik *${prefix}serang*!_
+💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat grup._
 `.trim());
       }
 
