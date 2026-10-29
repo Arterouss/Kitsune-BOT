@@ -14,7 +14,8 @@ import {
   equipFromArmory,
   sellFromArmory,
   rollGacha,
-  getDatabaseStatus
+  getDatabaseStatus,
+  recordBotMsg
 } from '../lib/rpg.js';
 
 // Global memory state for active group duels & boss raids
@@ -1395,6 +1396,7 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       }, { quoted: msg });
 
       if (raidSent?.key?.id) {
+        recordBotMsg(jid, raidSent.key.id, 'raid', 'rpg');
         if (!global.botMessageHistory) global.botMessageHistory = new Map();
         if (!global.botMessageHistory.has(jid)) global.botMessageHistory.set(jid, []);
         global.botMessageHistory.get(jid).push({ id: raidSent.key.id, command: 'raid', category: 'rpg', timestamp: Date.now() });
@@ -1442,6 +1444,7 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       }, { quoted: msg });
 
       if (tagSent?.key?.id) {
+        recordBotMsg(jid, tagSent.key.id, 'raid', 'rpg');
         if (!global.botMessageHistory) global.botMessageHistory = new Map();
         if (!global.botMessageHistory.has(jid)) global.botMessageHistory.set(jid, []);
         global.botMessageHistory.get(jid).push({ id: tagSent.key.id, command: 'raid', category: 'rpg', timestamp: Date.now() });

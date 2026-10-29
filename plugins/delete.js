@@ -1,23 +1,38 @@
 // plugins/delete.js - Fitur Hapus Pesan Bot, Pesan Member & Bersihkan Chat Raid RPG
 import { config } from '../config.js';
+import { getBotMsgs, removeBotMsgs } from '../lib/rpg.js';
 
 export default {
   name: 'delete',
-  command: ['del', 'delete', 'hapus', 'd', 'delraid', 'clearraid', 'delrpg', 'clearrpg'],
+  command: [
+    'del', 'dell', 'delete', 'delet', 'hapus', 'd',
+    'clear', 'bersih',
+    'delall', 'dellall', 'clearall',
+    'delraid', 'dellraid', 'clearraid',
+    'delrpg', 'dellrpg', 'clearrpg'
+  ],
   category: 'group',
   description: 'Hapus pesan yang di-reply atau bersihkan seluruh chat bot saat raid/rpg agar grup tidak penuh',
   async run({ sock, jid, msg, command, args, prefix, isGroup, reply, sender }) {
-    // Inisialisasi riwayat pesan bot di chat ini
+    // Inisialisasi memori riwayat pesan bot
     if (!global.botMessageHistory) global.botMessageHistory = new Map();
     if (!global.botMessageHistory.has(jid)) {
       global.botMessageHistory.set(jid, []);
     }
-    const historyList = global.botMessageHistory.get(jid);
+
+    // Gabungkan riwayat memori dan riwayat database persisten agar tetap tersimpan meski bot restart
+    const persistentMsgs = getBotMsgs(jid) || [];
+    const memoryMsgs = global.botMessageHistory.get(jid) || [];
+
+    const msgMap = new Map();
+    for (const m of persistentMsgs) msgMap.set(m.id, m);
+    for (const m of memoryMsgs) msgMap.set(m.id, m);
+    const historyList = Array.from(msgMap.values());
 
     const mode = (args || '').trim().toLowerCase();
-    const isRaidClear = ['delraid', 'clearraid'].includes(command) || mode === 'raid' || mode === 'boss';
-    const isRpgClear = ['delrpg', 'clearrpg'].includes(command) || mode === 'rpg';
-    const isAllClear = mode === 'all' || mode === 'semua';
+    const isRaidClear = ['delraid', 'dellraid', 'clearraid'].includes(command) || mode === 'raid' || mode === 'boss';
+    const isRpgClear = ['delrpg', 'dellrpg', 'clearrpg'].includes(command) || mode === 'rpg';
+    const isAllClear = ['delall', 'dellall', 'clearall'].includes(command) || mode === 'all' || mode === 'semua';
     const isCountClear = !isNaN(parseInt(mode)) && parseInt(mode) > 0;
 
     // Helper untuk menghapus daftar pesan bot secara berurutan
@@ -27,6 +42,8 @@ export default {
       }
 
       let successCount = 0;
+      const deletedIds = [];
+
       for (const item of targets) {
         try {
           await sock.sendMessage(jid, {
@@ -37,15 +54,17 @@ export default {
             }
           });
           successCount++;
+          deletedIds.push(item.id);
           // Jeda sedikit agar tidak terkena rate limit WhatsApp
           await new Promise((r) => setTimeout(r, 70));
         } catch {}
       }
 
-      // Hapus item yang sudah didelete dari historyList
-      const deletedIds = new Set(targets.map((t) => t.id));
-      const remaining = historyList.filter((m) => !deletedIds.has(m.id));
-      global.botMessageHistory.set(jid, remaining);
+      // Hapus ID yang sudah dibersihkan dari memori dan database persisten
+      const idSet = new Set(deletedIds);
+      const remainingMem = (global.botMessageHistory.get(jid) || []).filter((m) => !idSet.has(m.id));
+      global.botMessageHistory.set(jid, remainingMem);
+      removeBotMsgs(jid, deletedIds);
 
       // Hapus juga pesan perintah pengirim jika di grup
       if (msg.key?.id) {
@@ -71,7 +90,6 @@ export default {
     if (isRaidClear) {
       const raidCommands = ['raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi', 'tagraid', 'ajakraid'];
       
-      // Ambil dari riwayat bot yang berhubungan dengan raid
       let raidTargets = historyList.filter((m) => {
         return raidCommands.includes(m.command) || m.category === 'raid';
       });

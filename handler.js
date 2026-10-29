@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { config } from './config.js';
+import { recordBotMsg } from './lib/rpg.js';
 
 // Koleksi Plugin dan Cooldown
 export const plugins = [];
@@ -149,6 +150,7 @@ export async function messageHandler(sock, msg) {
     const reply = async (text, options = {}) => {
       const sent = await sock.sendMessage(jid, { text }, { quoted: msg, ...options });
       if (sent?.key?.id) {
+        recordBotMsg(jid, sent.key.id, command, matchedPlugin?.category || 'general');
         historyList.push({
           id: sent.key.id,
           command,
