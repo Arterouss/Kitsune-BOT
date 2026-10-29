@@ -935,24 +935,24 @@ Berhasil membuat *${recipe.name}*!
 ┃ 🎯 *Pity Garansi (5★):* [${pityBar}] ${user.gachaPity || 0}/50
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🌌 *RANK TERTINGGI: 6★ ETERNAL (GOD TIER - 0.001%):*
-• 🌌 *Pedang Kejadian Genesis Ea* (+850 ATK) ─ Senjata primordial pemisah kosmik
-• 🔱 *Tombak Takdir Longinus* (+780 ATK) ─ Penembus dimensi dewa
-• 🛡️ *Zirah Keabadian Ouroboros* (+620 DEF) ─ Pelindung siklus abadi
-• ⛏️ *Beliung Kosmik Celestial* (Tier 7) ─ Pengeruk inti bintang
+🌌 *Perlengkapan 6★ Eternal (0.001%):*
+• ⚔️ *Pedang Ea* (+850 ATK) ─ Senjata kuno terkuat
+• 🔱 *Tombak Longinus* (+780 ATK) ─ Tombak suci terkuat
+• 🛡️ *Zirah Ouroboros* (+620 DEF) ─ Zirah pelindung terkuat
+• ⛏️ *Beliung Celestial* (Tier 7) ─ Beliung tambang tertinggi
 
-👑 *Senjata Eksklusif 5★ Mythic:*
-• ⚔️ *Pedang Excalibur* (+400 ATK) ─ Senjata terkuat cahaya
+👑 *Senjata 5★ Mythic:*
+• ⚔️ *Pedang Excalibur* (+400 ATK) ─ Pedang suci cahaya
 • 🗡️ *Pedang Muramasa* (+360 ATK) ─ Pedang terkutuk haus darah
 • 🛡️ *Zirah Aegis* (+290 DEF) ─ Perisai dewa pelindung mutlak
 • ⛏️ *Beliung Mithril* (Tier 6) ─ Beliung tambang kristal suci
 
 💎 *Sistem Pity (Garansi 50x Tarikan 5★):*
 Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kamu **PASTI DIJAMIN 100%** mendapatkan salah satu Senjata 5★ Mythic! (Pity reset jika dapat 5★).
-_Catatan: 6★ Eternal adalah keajaiban jackpot mutlak bebas batas pity!_
+_Catatan: Rank 6★ Eternal bisa didapat kapan saja tanpa batas pity._
 
 📊 *Peluang Drop:*
-• 🌌 6★ Eternal: *0.001%* (1 : 100.000 ─ Keajaiban Kosmik!)
+• 🌌 6★ Eternal: *0.001%* (Ultra Rare)
 • 👑 5★ Mythic: *2.5%* (Pity 50x Garansi)
 • ✨ 4★ Epic: *17.5%* (Senjata Naga, Berlian, Emas, Tiket)
 • ⚪ 3★ Rare: *80.0%* (Ramuan Besar, Kitab EXP, Jimat, Material)
@@ -987,10 +987,8 @@ ${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
 `.trim();
 
       if (result.gotEternal) {
-        replyMsg += `\n\n🌌⚡ *DIVINE MIRACLE! PANGGILAN KOSMIK BERGEMA!* ⚡🌌`;
-        replyMsg += `\n👑 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 6★ ETERNAL (GOD TIER)!*`;
-        replyMsg += `\nPeluang hanya *0.001%* (1 banding 100.000)! Kamu adalah makhluk terpilih semesta!`;
-        replyMsg += `\n✨ Perlengkapan telah tersimpan di *${prefix}lemari*. Pasang dengan *${prefix}equip <nama/id>*!`;
+        replyMsg += `\n\n🎉 *HOKI BESAR! KAMU DAPAT ITEM 6★ ETERNAL!*`;
+        replyMsg += `\nRate cuma *0.001%*! Cek lemarimu di *${prefix}lemari* dan pasang dengan *${prefix}equip <id/nama>*.`;
       }
       if (result.got5Star) {
         replyMsg += `\n\n🎉 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 5★ MYTHIC!*`;
