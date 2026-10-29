@@ -10,6 +10,7 @@ import {
   CRAFT_RECIPES,
   MONSTERS,
   RAID_BOSSES,
+  GACHA_POOL_ETERNAL,
   addToArmory,
   equipFromArmory,
   sellFromArmory,
@@ -928,22 +929,30 @@ Berhasil membuat *${recipe.name}*!
       if (!mode || (!['1', '10', 'single', 'multi'].includes(mode))) {
         const pityBar = renderBar(user.gachaPity || 0, 50, 10);
         const text = `
-╭━━━━━「 🌌 *GACHA SENJATA MYTHIC* 」━━━━━╮
+╭━━━━━「 🌌 *GACHA SENJATA MYTHIC & ETERNAL* 」━━━━━╮
 ┃ 👤 *Petualang:* ${user.name}
 ┃ 💰 *Koin Kamu:* ${formatNumber(user.money)} Gold
-┃ 🎯 *Pity Garansi:* [${pityBar}] ${user.gachaPity || 0}/50
+┃ 🎯 *Pity Garansi (5★):* [${pityBar}] ${user.gachaPity || 0}/50
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-👑 *Senjata Eksklusif 5★ (Tidak Ada di Toko):*
+🌌 *RANK TERTINGGI: 6★ ETERNAL (GOD TIER - 0.001%):*
+• 🌌 *Pedang Kejadian Genesis Ea* (+850 ATK) ─ Senjata primordial pemisah kosmik
+• 🔱 *Tombak Takdir Longinus* (+780 ATK) ─ Penembus dimensi dewa
+• 🛡️ *Zirah Keabadian Ouroboros* (+620 DEF) ─ Pelindung siklus abadi
+• ⛏️ *Beliung Kosmik Celestial* (Tier 7) ─ Pengeruk inti bintang
+
+👑 *Senjata Eksklusif 5★ Mythic:*
 • ⚔️ *Pedang Excalibur* (+400 ATK) ─ Senjata terkuat cahaya
 • 🗡️ *Pedang Muramasa* (+360 ATK) ─ Pedang terkutuk haus darah
 • 🛡️ *Zirah Aegis* (+290 DEF) ─ Perisai dewa pelindung mutlak
 • ⛏️ *Beliung Mithril* (Tier 6) ─ Beliung tambang kristal suci
 
-💎 *Sistem Pity (Garansi 50x Tarikan):*
-Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kamu **PASTI DIJAMIN 100%** mendapatkan salah satu Senjata 5★ Mythic! (Pity otomatis reset jika dapat 5★).
+💎 *Sistem Pity (Garansi 50x Tarikan 5★):*
+Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kamu **PASTI DIJAMIN 100%** mendapatkan salah satu Senjata 5★ Mythic! (Pity reset jika dapat 5★).
+_Catatan: 6★ Eternal adalah keajaiban jackpot mutlak bebas batas pity!_
 
 📊 *Peluang Drop:*
+• 🌌 6★ Eternal: *0.001%* (1 : 100.000 ─ Keajaiban Kosmik!)
 • 👑 5★ Mythic: *2.5%* (Pity 50x Garansi)
 • ✨ 4★ Epic: *17.5%* (Senjata Naga, Berlian, Emas, Tiket)
 • ⚪ 3★ Rare: *80.0%* (Ramuan Besar, Kitab EXP, Jimat, Material)
@@ -977,10 +986,17 @@ Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kam
 ${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
 `.trim();
 
+      if (result.gotEternal) {
+        replyMsg += `\n\n🌌⚡ *DIVINE MIRACLE! PANGGILAN KOSMIK BERGEMA!* ⚡🌌`;
+        replyMsg += `\n👑 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 6★ ETERNAL (GOD TIER)!*`;
+        replyMsg += `\nPeluang hanya *0.001%* (1 banding 100.000)! Kamu adalah makhluk terpilih semesta!`;
+        replyMsg += `\n✨ Perlengkapan telah tersimpan di *${prefix}lemari*. Pasang dengan *${prefix}equip <nama/id>*!`;
+      }
       if (result.got5Star) {
         replyMsg += `\n\n🎉 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 5★ MYTHIC!*`;
         replyMsg += `\n✨ Perlengkapan telah tersimpan di *${prefix}lemari*. Pasang dengan *${prefix}equip <nama/id>*!`;
-      } else {
+      }
+      if (!result.gotEternal && !result.got5Star) {
         const remaining = 50 - result.pity;
         replyMsg += `\n\n🎯 *Pity Tracker:* Kurang *${remaining} tarikan* lagi menuju Garansi 5★ Mythic!`;
         replyMsg += `\n💡 Tarik lagi: \`${prefix}gacha ${times}\``;

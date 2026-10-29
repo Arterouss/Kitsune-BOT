@@ -100,7 +100,7 @@ export default {
           {
             cmd: "gacha",
             param: "<1/10>",
-            desc: "Gacha senjata Mythic (Pity 50x)",
+            desc: "Gacha senjata Mythic & Eternal 6★",
           },
           { cmd: "top", param: "", desc: "Peringkat petualang terkuat" },
           {
