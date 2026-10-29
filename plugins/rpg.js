@@ -1371,7 +1371,7 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
         mentions = (meta.participants || []).map(p => p.id);
       } catch {}
 
-      return await sock.sendMessage(jid, {
+      const raidSent = await sock.sendMessage(jid, {
         text: `
 🔥━━━━━「 🚨 *WORLD BOSS MUNCUL!* 🚨 」━━━━━🔥
 *${bossFullName}* telah menginvasi grup ini!
@@ -1389,10 +1389,21 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
 
 ⚔️ *Ayo serang bersama!* Ketik: *${prefix}serang*
 📢 _Ajak teman grup:_ Ketik *${prefix}tagraid*
-💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat._
+💡 _Hapus semua chat raid di grup: ketik *${prefix}del raid*_
 `.trim(),
         mentions
       }, { quoted: msg });
+
+      if (raidSent?.key?.id) {
+        if (!global.botMessageHistory) global.botMessageHistory = new Map();
+        if (!global.botMessageHistory.has(jid)) global.botMessageHistory.set(jid, []);
+        global.botMessageHistory.get(jid).push({ id: raidSent.key.id, command: 'raid', category: 'rpg', timestamp: Date.now() });
+        if (global.rpgRaids[jid]) {
+          global.rpgRaids[jid].messageIds = global.rpgRaids[jid].messageIds || [];
+          global.rpgRaids[jid].messageIds.push(raidSent.key.id);
+        }
+      }
+      return raidSent;
     }
 
     // ──────────────────────────────────────────────────────────
@@ -1415,7 +1426,7 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       const persen = Math.round((raid.hp / raid.maxHp) * 100);
       const sisaWaktu = formatDuration(Math.max(0, raid.expiresAt - now));
 
-      return await sock.sendMessage(jid, {
+      const tagSent = await sock.sendMessage(jid, {
         text: `
 🚨 *PANGGILAN PERANG WORLD BOSS RAID!* 🚨
 👤 *${user.name}* memanggil seluruh petualang di grup ini untuk membantu mengalahkan *${raid.name}*!
@@ -1425,9 +1436,21 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
 
 ⚔️ *Ayo serang sekarang bareng-bareng!*
 👉 Ketik *${prefix}serang* untuk memukul!
+💡 _Hapus semua chat raid: ketik *${prefix}del raid*_
 `.trim(),
         mentions
       }, { quoted: msg });
+
+      if (tagSent?.key?.id) {
+        if (!global.botMessageHistory) global.botMessageHistory = new Map();
+        if (!global.botMessageHistory.has(jid)) global.botMessageHistory.set(jid, []);
+        global.botMessageHistory.get(jid).push({ id: tagSent.key.id, command: 'raid', category: 'rpg', timestamp: Date.now() });
+        if (global.rpgRaids[jid]) {
+          global.rpgRaids[jid].messageIds = global.rpgRaids[jid].messageIds || [];
+          global.rpgRaids[jid].messageIds.push(tagSent.key.id);
+        }
+      }
+      return tagSent;
     }
 
     // ──────────────────────────────────────────────────────────
@@ -1529,7 +1552,7 @@ ${bossCounterHeadline}
 [${hpBar}] ${formatNumber(raid.hp)} / ${formatNumber(raid.maxHp)} HP (${persen}%)
 
 🔥 _Ayo serang lagi ketik *${prefix}serang*!_
-💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat grup._
+💡 _Hapus semua chat raid: ketik *${prefix}del raid* (atau quote *.del*)_
 `.trim());
       }
 

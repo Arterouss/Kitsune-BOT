@@ -138,9 +138,26 @@ export async function messageHandler(sock, msg) {
 
     console.log(`[COMMAND] ${prefix}${command} | Pengirim: ${senderName}`);
 
-    // Helper kirim balasan pesan
-    const reply = async (text) => {
-      return await sock.sendMessage(jid, { text }, { quoted: msg });
+    // Inisialisasi riwayat pesan bot per chat untuk fitur bulk delete (.del raid / .del all)
+    if (!global.botMessageHistory) global.botMessageHistory = new Map();
+    if (!global.botMessageHistory.has(jid)) {
+      global.botMessageHistory.set(jid, []);
+    }
+    const historyList = global.botMessageHistory.get(jid);
+
+    // Helper kirim balasan pesan dengan pencatatan riwayat otomatis
+    const reply = async (text, options = {}) => {
+      const sent = await sock.sendMessage(jid, { text }, { quoted: msg, ...options });
+      if (sent?.key?.id) {
+        historyList.push({
+          id: sent.key.id,
+          command,
+          category: matchedPlugin?.category || 'general',
+          timestamp: Date.now()
+        });
+        if (historyList.length > 350) historyList.shift();
+      }
+      return sent;
     };
 
     // Jalankan Plugin
