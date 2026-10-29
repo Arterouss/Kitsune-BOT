@@ -118,7 +118,8 @@ async function startBot() {
     auth: state,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
     generateHighQualityLinkPreview: true,
-    syncFullHistory: false
+    syncFullHistory: false,
+    getMessage: async () => undefined
   });
   currentSock = sock;
 
@@ -249,6 +250,10 @@ async function startBot() {
 
 // Menangani Error yang Tidak Tertangkap agar Bot Tidak Mati (Anti-Crash)
 process.on('uncaughtException', (err) => {
+  if (err?.message?.includes('Bad MAC')) {
+    console.warn('⚠️ [SIGNAL DECRYPT] Kunci sesi enkripsi chat tidak sinkron (Bad MAC). Pesan dilewati dengan aman.');
+    return;
+  }
   console.error('[UNCAUGHT EXCEPTION]:', err);
 });
 process.on('unhandledRejection', (reason, promise) => {
