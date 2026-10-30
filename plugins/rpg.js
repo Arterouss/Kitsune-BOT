@@ -435,37 +435,49 @@ Kamu mengayunkan *${user.equipment.pickaxe}* ke dinding batu gua yang dalam...
         return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)! Tidak perlu minum obat.`);
       }
 
-      const wantsBig = args && (args.toLowerCase().includes('besar') || args.toLowerCase().includes('large'));
+      const argsStr = (args || '').trim().toLowerCase();
+      const wantsBig = argsStr.includes('besar') || argsStr.includes('large');
+      const numMatch = argsStr.match(/\d+/);
+      const isAll = argsStr.includes('all') || argsStr.includes('semua');
+      let requestedCount = numMatch ? parseInt(numMatch[0]) : (isAll ? 999 : 1);
+      if (requestedCount < 1) requestedCount = 1;
 
       if (wantsBig) {
-        if ((user.inventory.potion_hp_besar || 0) <= 0) {
+        const available = user.inventory.potion_hp_besar || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Ramuan HP Besar* di tas!\nBeli di *${prefix}shop* atau minum ramuan biasa dengan *${prefix}heal*.`);
         }
-        user.inventory.potion_hp_besar -= 1;
-        const healAmount = 160;
+        const needed = Math.ceil((user.maxHp - user.hp) / 160);
+        const count = Math.min(requestedCount, available, needed);
         const oldHp = user.hp;
-        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        user.hp = Math.min(user.maxHp, user.hp + (count * 160));
+        user.inventory.potion_hp_besar -= count;
         const recovered = user.hp - oldHp;
         saveRpgDb();
-        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
+        return reply(`🧪 *GULP GULP~!* Kamu meminum *${count}x Ramuan HP Besar*.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
       }
 
-      if ((user.inventory.potion_hp || 0) > 0) {
-        user.inventory.potion_hp -= 1;
-        const healAmount = 60;
+      const normalAvail = user.inventory.potion_hp || 0;
+      const bigAvail = user.inventory.potion_hp_besar || 0;
+
+      if (normalAvail > 0) {
+        const needed = Math.ceil((user.maxHp - user.hp) / 60);
+        const count = Math.min(requestedCount, normalAvail, needed);
         const oldHp = user.hp;
-        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        user.hp = Math.min(user.maxHp, user.hp + (count * 60));
+        user.inventory.potion_hp -= count;
         const recovered = user.hp - oldHp;
         saveRpgDb();
-        return reply(`🧪 *SLURP~!* Kamu meminum Ramuan HP.\n❤️ Darah pulih +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan: ${user.inventory.potion_hp})`);
-      } else if ((user.inventory.potion_hp_besar || 0) > 0) {
-        user.inventory.potion_hp_besar -= 1;
-        const healAmount = 160;
+        return reply(`🧪 *SLURP~!* Kamu meminum *${count}x Ramuan HP*.\n❤️ Darah pulih +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan: ${user.inventory.potion_hp})`);
+      } else if (bigAvail > 0) {
+        const needed = Math.ceil((user.maxHp - user.hp) / 160);
+        const count = Math.min(requestedCount, bigAvail, needed);
         const oldHp = user.hp;
-        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        user.hp = Math.min(user.maxHp, user.hp + (count * 160));
+        user.inventory.potion_hp_besar -= count;
         const recovered = user.hp - oldHp;
         saveRpgDb();
-        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
+        return reply(`🧪 *GULP GULP~!* Kamu meminum *${count}x Ramuan HP Besar*.\n❤️ Darah pulih drastis +${recovered} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa ramuan besar: ${user.inventory.potion_hp_besar})`);
       } else {
         return reply(`❌ Kamu tidak memiliki *Ramuan HP* di tas!\nBeli ramuan di *${prefix}shop* atau istirahat sejenak (HP pulih otomatis 1 poin tiap 45 detik).`);
       }
@@ -478,51 +490,85 @@ Kamu mengayunkan *${user.equipment.pickaxe}* ke dinding batu gua yang dalam...
       if (!args) {
         return reply(`
 🎒 *PENGGUNAAN ITEM PENDUKUNG:*
-Ketik: *${prefix}use <nama_item>*
+Ketik: *${prefix}use <nama_item> [jumlah]*
+Contoh: *${prefix}use kitab_exp 10* atau *${prefix}use potion_hp 5*
 
 📋 *Daftar Item yang Bisa Dipakai:*
-• \`${prefix}use potion_hp\` ─ Minum Ramuan HP (+60 HP)
-• \`${prefix}use potion_hp_besar\` ─ Minum Ramuan HP Besar (+160 HP)
-• \`${prefix}use potion_stamina\` ─ Minum Ramuan Stamina (+60 Stamina)
-• \`${prefix}use potion_stamina_besar\` ─ Minum Ramuan Stamina Besar (+120 Stamina)
-• \`${prefix}use kitab_exp\` ─ Membaca Kitab Pengalaman (+250 EXP)
+• \`${prefix}use potion_hp [jumlah]\` ─ Minum Ramuan HP (+60 HP/botol)
+• \`${prefix}use potion_hp_besar [jumlah]\` ─ Minum Ramuan HP Besar (+160 HP/botol)
+• \`${prefix}use potion_stamina [jumlah]\` ─ Minum Ramuan Stamina (+60 Stamina/botol)
+• \`${prefix}use potion_stamina_besar [jumlah]\` ─ Minum Ramuan Stamina Besar (+120 Stamina/botol)
+• \`${prefix}use kitab_exp [jumlah]\` ─ Membaca Kitab Pengalaman (+250 EXP/buku)
 • \`${prefix}use tiket_raid\` ─ Reset Cooldown World Boss grup
 • \`${prefix}use jimat_pelindung\` ─ Cek status perlindungan jimat
 `.trim());
       }
 
-      const itemKey = args.trim().toLowerCase().replace(/\s+/g, '_');
+      // Parsing nama item dan jumlah pemakaian
+      const tokens = args.trim().split(/\s+/);
+      let rawCount = 1;
+      let itemTokens = [];
+
+      const lastToken = tokens[tokens.length - 1].toLowerCase();
+      const firstToken = tokens[0].toLowerCase();
+
+      if (!isNaN(parseInt(lastToken)) && parseInt(lastToken) > 0) {
+        rawCount = parseInt(lastToken);
+        itemTokens = tokens.slice(0, tokens.length - 1);
+      } else if (['all', 'semua'].includes(lastToken)) {
+        rawCount = 'all';
+        itemTokens = tokens.slice(0, tokens.length - 1);
+      } else if (!isNaN(parseInt(firstToken)) && parseInt(firstToken) > 0) {
+        rawCount = parseInt(firstToken);
+        itemTokens = tokens.slice(1);
+      } else if (['all', 'semua'].includes(firstToken)) {
+        rawCount = 'all';
+        itemTokens = tokens.slice(1);
+      } else {
+        rawCount = 1;
+        itemTokens = tokens;
+      }
+
+      const itemKey = itemTokens.join('_').toLowerCase();
 
       // 1. Ramuan HP Biasa
-      if (['potion_hp', 'hp', 'darah'].includes(itemKey)) {
+      if (['potion_hp', 'hp', 'darah', 'potion_darah'].includes(itemKey)) {
         if (user.hp >= user.maxHp) {
           return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)!`);
         }
-        if ((user.inventory.potion_hp || 0) <= 0) {
+        const available = user.inventory.potion_hp || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Ramuan HP* di tas! Beli di *${prefix}shop*.`);
         }
-        user.inventory.potion_hp -= 1;
-        const healAmount = 60;
+        const needed = Math.ceil((user.maxHp - user.hp) / 60);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
         const oldHp = user.hp;
-        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        user.hp = Math.min(user.maxHp, user.hp + (count * 60));
+        user.inventory.potion_hp -= count;
         saveRpgDb();
-        return reply(`🧪 *SLURP~!* Kamu meminum Ramuan HP.\n❤️ Darah pulih +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp}).`);
+        return reply(`🧪 *SLURP~!* Kamu meminum *${count}x Ramuan HP*.\n❤️ Darah pulih +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp}).`);
       }
 
       // 2. Ramuan HP Besar
-      if (['potion_hp_besar', 'hp_besar', 'darah_besar'].includes(itemKey)) {
+      if (['potion_hp_besar', 'hp_besar', 'darah_besar', 'potion_besar'].includes(itemKey)) {
         if (user.hp >= user.maxHp) {
           return reply(`❤️ Darahmu sudah penuh (${user.hp}/${user.maxHp} HP)!`);
         }
-        if ((user.inventory.potion_hp_besar || 0) <= 0) {
+        const available = user.inventory.potion_hp_besar || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Ramuan HP Besar* di tas! Beli di *${prefix}shop*.`);
         }
-        user.inventory.potion_hp_besar -= 1;
-        const healAmount = 160;
+        const needed = Math.ceil((user.maxHp - user.hp) / 160);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
         const oldHp = user.hp;
-        user.hp = Math.min(user.maxHp, user.hp + healAmount);
+        user.hp = Math.min(user.maxHp, user.hp + (count * 160));
+        user.inventory.potion_hp_besar -= count;
         saveRpgDb();
-        return reply(`🧪 *GULP GULP~!* Kamu meminum Ramuan HP Besar.\n❤️ Darah pulih drastis +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp_besar}).`);
+        return reply(`🧪 *GULP GULP~!* Kamu meminum *${count}x Ramuan HP Besar*.\n❤️ Darah pulih drastis +${user.hp - oldHp} HP!\n📊 Kondisi sekarang: *${user.hp}/${user.maxHp} HP* (Sisa: ${user.inventory.potion_hp_besar}).`);
       }
 
       // 3. Ramuan Stamina Biasa
@@ -530,50 +576,66 @@ Ketik: *${prefix}use <nama_item>*
         if (user.stamina >= user.maxStamina) {
           return reply(`⚡ Staminamu sudah penuh (${user.stamina}/${user.maxStamina})!`);
         }
-        if ((user.inventory.potion_stamina || 0) <= 0) {
+        const available = user.inventory.potion_stamina || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Ramuan Stamina* di tas! Beli di *${prefix}shop*.`);
         }
-        user.inventory.potion_stamina -= 1;
-        const restoreAmount = 60;
+        const needed = Math.ceil((user.maxStamina - user.stamina) / 60);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
         const oldStamina = user.stamina;
-        user.stamina = Math.min(user.maxStamina, user.stamina + restoreAmount);
+        user.stamina = Math.min(user.maxStamina, user.stamina + (count * 60));
+        user.inventory.potion_stamina -= count;
         saveRpgDb();
-        return reply(`⚡ *GLEK GLEK~!* Kamu meminum Ramuan Stamina.\n⚡ Stamina pulih +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina}).`);
+        return reply(`⚡ *GLEK GLEK~!* Kamu meminum *${count}x Ramuan Stamina*.\n⚡ Stamina pulih +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina}).`);
       }
 
       // 4. Ramuan Stamina Besar
-      if (['potion_stamina_besar', 'stamina_besar'].includes(itemKey)) {
+      if (['potion_stamina_besar', 'stamina_besar', 'energi_besar'].includes(itemKey)) {
         if (user.stamina >= user.maxStamina) {
           return reply(`⚡ Staminamu sudah penuh (${user.stamina}/${user.maxStamina})!`);
         }
-        if ((user.inventory.potion_stamina_besar || 0) <= 0) {
+        const available = user.inventory.potion_stamina_besar || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Ramuan Stamina Besar* di tas! Beli di *${prefix}shop*.`);
         }
-        user.inventory.potion_stamina_besar -= 1;
-        const restoreAmount = 120;
+        const needed = Math.ceil((user.maxStamina - user.stamina) / 120);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
         const oldStamina = user.stamina;
-        user.stamina = Math.min(user.maxStamina, user.stamina + restoreAmount);
+        user.stamina = Math.min(user.maxStamina, user.stamina + (count * 120));
+        user.inventory.potion_stamina_besar -= count;
         saveRpgDb();
-        return reply(`⚡ *GLEK GLEK~!* Kamu meminum Ramuan Stamina Besar!\n⚡ Stamina terisi penuh +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina_besar}).`);
+        return reply(`⚡ *GLEK GLEK~!* Kamu meminum *${count}x Ramuan Stamina Besar*!\n⚡ Stamina terisi +${user.stamina - oldStamina} poin!\n📊 Kondisi sekarang: *${user.stamina}/${user.maxStamina}* (Sisa: ${user.inventory.potion_stamina_besar}).`);
       }
 
       // 5. Kitab Pengalaman
-      if (['kitab_exp', 'kitab', 'exp_book', 'buku_exp'].includes(itemKey)) {
-        if ((user.inventory.kitab_exp || 0) <= 0) {
+      if (['kitab_exp', 'kitab', 'exp_book', 'buku_exp', 'exp'].includes(itemKey)) {
+        const available = user.inventory.kitab_exp || 0;
+        if (available <= 0) {
           return reply(`❌ Kamu tidak memiliki *Kitab Pengalaman* di tas! Beli di *${prefix}shop*.`);
         }
-        user.inventory.kitab_exp -= 1;
-        const expGain = 250;
-        const lvlRes = addExp(user, expGain);
+
+        const count = rawCount === 'all' ? available : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) {
+          return reply(`❌ Masukkan jumlah kitab yang valid (minimal 1)!`);
+        }
+
+        user.inventory.kitab_exp -= count;
+        const totalExp = count * 250;
+        const lvlRes = addExp(user, totalExp);
         saveRpgDb();
 
-        let expText = `📖 *KITAB PENGALAMAN DIBACA!*
+        const levelsGained = (lvlRes.newLevel || user.level) - (lvlRes.oldLevel || user.level);
+        let expText = `📖 *${count}x KITAB PENGALAMAN DIBACA!*
 Cahaya kebijaksanaan merasuki pikiranmu!
-📈 Mendapatkan: *+${expGain} EXP*!
+📈 Mendapatkan: *+${formatNumber(totalExp)} EXP* (${count} x 250 EXP)!
 📊 EXP Sekarang: *${user.exp}/${user.maxExp}* (Sisa Kitab: ${user.inventory.kitab_exp})`;
 
         if (lvlRes.leveledUp) {
-          expText += `\n\n🎉 *LEVEL UP!* Kamu naik ke *Level ${lvlRes.newLevel}*!\n⭐ Gelar: *${user.title}*\n❤️ HP & Stamina meningkat penuh!`;
+          expText += `\n\n🎉 *LEVEL UP!* Kamu naik ${levelsGained > 1 ? `*+${levelsGained} Level* sekaligus` : ''} ke *Level ${lvlRes.newLevel}*!\n⭐ Gelar: *${user.title}*\n❤️ HP & Stamina meningkat penuh!`;
         }
 
         return reply(expText);
