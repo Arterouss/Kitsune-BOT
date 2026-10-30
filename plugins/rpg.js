@@ -1715,7 +1715,7 @@ ${bossCounterHeadline}
 ${rewardSummary.join('\n\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌟 _Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
-`.trim(), { deleteDelay: 60000 });
+`.trim());
     }
 
     // ──────────────────────────────────────────────────────────
