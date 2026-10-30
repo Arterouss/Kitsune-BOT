@@ -88,7 +88,8 @@ export default {
 ┃ 🗡️ *Senjata:* ${user.equipment.weapon} (+${user.equipment.weaponAtk} ATK)
 ┃ 🛡️ *Zirah:* ${user.equipment.armor} (+${user.equipment.armorDef} DEF)
 ┃ ⛏️ *Beliung:* ${user.equipment.pickaxe}
-┃ 🎯 *Pity Gacha:* ${user.gachaPity || 0}/50 (Garansi 5★)
+┃ 🎯 *Pity Mythic (5★):* ${user.gachaPity || 0}/120
+┃ 🌌 *Pity Eternal (6★):* ${user.gachaPityEternal || 0}/500
 ┃
 ┃ 📜 *Catatan Petualang:*
 ┃  • Menang Adventure: ${formatNumber(user.stats.adventures)} kali
@@ -927,15 +928,17 @@ Berhasil membuat *${recipe.name}*!
       const mode = args?.trim().toLowerCase();
 
       if (!mode || (!['1', '10', 'single', 'multi'].includes(mode))) {
-        const pityBar = renderBar(user.gachaPity || 0, 50, 10);
+        const pityMythicBar = renderBar(user.gachaPity || 0, 120, 10);
+        const pityEternalBar = renderBar(user.gachaPityEternal || 0, 500, 10);
         const text = `
 ╭━━━━━「 🌌 *GACHA SENJATA MYTHIC & ETERNAL* 」━━━━━╮
 ┃ 👤 *Petualang:* ${user.name}
 ┃ 💰 *Koin Kamu:* ${formatNumber(user.money)} Gold
-┃ 🎯 *Pity Garansi (5★):* [${pityBar}] ${user.gachaPity || 0}/50
+┃ 🎯 *Pity Mythic (5★):* [${pityMythicBar}] ${user.gachaPity || 0}/120
+┃ 🌌 *Pity Eternal (6★):* [${pityEternalBar}] ${user.gachaPityEternal || 0}/500
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🌌 *Perlengkapan 6★ Eternal (0.001%):*
+🌌 *Perlengkapan 6★ Eternal:*
 • ⚔️ *Pedang Ea* (+850 ATK) ─ Senjata kuno terkuat
 • 🔱 *Tombak Longinus* (+780 ATK) ─ Tombak suci terkuat
 • 🛡️ *Zirah Ouroboros* (+620 DEF) ─ Zirah pelindung terkuat
@@ -947,14 +950,14 @@ Berhasil membuat *${recipe.name}*!
 • 🛡️ *Zirah Aegis* (+290 DEF) ─ Perisai dewa pelindung mutlak
 • ⛏️ *Beliung Mithril* (Tier 6) ─ Beliung tambang kristal suci
 
-💎 *Sistem Pity (Garansi 50x Tarikan 5★):*
-Setiap kali tarik, meteran Pity bertambah +1. Jika mencapai **50x Tarikan**, kamu **PASTI DIJAMIN 100%** mendapatkan salah satu Senjata 5★ Mythic! (Pity reset jika dapat 5★).
-_Catatan: Rank 6★ Eternal bisa didapat kapan saja tanpa batas pity._
+💎 *Sistem Garansi Pity:*
+• 👑 *Pity 5★ Mythic (120x):* Jika mencapai 120x tarikan, kamu **PASTI DIJAMIN 100%** mendapatkan perlengkapan 5★ Mythic! (Reset saat dapat 5★).
+• 🌌 *Pity 6★ Eternal (500x):* Jika mencapai 500x tarikan, kamu **PASTI DIJAMIN 100%** mendapatkan perlengkapan 6★ Eternal! (Reset saat dapat 6★).
 
 📊 *Peluang Drop:*
-• 🌌 6★ Eternal: *0.001%* (Ultra Rare)
-• 👑 5★ Mythic: *2.5%* (Pity 50x Garansi)
-• ✨ 4★ Epic: *17.5%* (Senjata Naga, Berlian, Emas, Tiket)
+• 🌌 6★ Eternal: *0.001%* (Garansi Pity 500x)
+• 👑 5★ Mythic: *1.0%* (Garansi Pity 120x ─ Lebih Menantang!)
+• ✨ 4★ Epic: *19.0%* (Senjata Naga, Berlian, Emas, Tiket)
 • ⚪ 3★ Rare: *80.0%* (Ramuan Besar, Kitab EXP, Jimat, Material)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -973,14 +976,16 @@ _Catatan: Rank 6★ Eternal bisa didapat kapan saja tanpa batas pity._
         return reply(`❌ ${result.msg}`);
       }
 
-      const pityBar = renderBar(result.pity, 50, 10);
+      const pityMythicBar = renderBar(result.pity, 120, 10);
+      const pityEternalBar = renderBar(result.pityEternal, 500, 10);
       const headerTitle = times === 10 ? '✨ 10x GACHA RESULT' : '✨ 1x GACHA RESULT';
 
       let replyMsg = `
 ╭━━━━━「 ${headerTitle} 」━━━━━╮
 ┃ 👤 *Petualang:* ${user.name}
 ┃ 💰 *Sisa Koin:* ${formatNumber(user.money)} Gold
-┃ 🎯 *Pity Saat Ini:* [${pityBar}] ${result.pity}/50
+┃ 🎯 *Pity Mythic:* [${pityMythicBar}] ${result.pity}/120
+┃ 🌌 *Pity Eternal:* [${pityEternalBar}] ${result.pityEternal}/500
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 ${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
@@ -988,15 +993,18 @@ ${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
 
       if (result.gotEternal) {
         replyMsg += `\n\n🎉 *HOKI BESAR! KAMU DAPAT ITEM 6★ ETERNAL!*`;
-        replyMsg += `\nRate cuma *0.001%*! Cek lemarimu di *${prefix}lemari* dan pasang dengan *${prefix}equip <id/nama>*.`;
+        replyMsg += `\nCek lemarimu di *${prefix}lemari* dan pasang dengan *${prefix}equip <id/nama>*.`;
       }
       if (result.got5Star) {
         replyMsg += `\n\n🎉 *SELAMAT! KAMU MENDAPATKAN PERLENGKAPAN 5★ MYTHIC!*`;
         replyMsg += `\n✨ Perlengkapan telah tersimpan di *${prefix}lemari*. Pasang dengan *${prefix}equip <nama/id>*!`;
       }
       if (!result.gotEternal && !result.got5Star) {
-        const remaining = 50 - result.pity;
-        replyMsg += `\n\n🎯 *Pity Tracker:* Kurang *${remaining} tarikan* lagi menuju Garansi 5★ Mythic!`;
+        const remainingMythic = 120 - result.pity;
+        const remainingEternal = 500 - result.pityEternal;
+        replyMsg += `\n\n🎯 *Pity Tracker:*`;
+        replyMsg += `\n• Kurang *${remainingMythic} tarikan* lagi menuju Garansi 5★ Mythic!`;
+        replyMsg += `\n• Kurang *${remainingEternal} tarikan* lagi menuju Garansi 6★ Eternal!`;
         replyMsg += `\n💡 Tarik lagi: \`${prefix}gacha ${times}\``;
       }
 
@@ -1645,7 +1653,7 @@ ${bossCounterHeadline}
 ${rewardSummary.join('\n\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌟 _Cek saldo & item barumu di *${prefix}profile* atau *${prefix}inv*._
-`.trim());
+`.trim(), { deleteDelay: 60000 });
     }
 
     // ──────────────────────────────────────────────────────────

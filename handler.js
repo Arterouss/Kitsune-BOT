@@ -148,7 +148,13 @@ export async function messageHandler(sock, msg) {
 
     // Helper kirim balasan pesan dengan pencatatan riwayat otomatis
     const reply = async (text, options = {}) => {
-      const sent = await sock.sendMessage(jid, { text }, { quoted: msg, ...options });
+      let finalText = text;
+      const isRpgGroup = isGroup && matchedPlugin?.category === 'rpg' && !options.noAutoDelete;
+      if (isRpgGroup) {
+        finalText += '\n\n_(⏱️ Pesan & perintah ini otomatis terhapus dalam 15 detik agar grup bersih)_';
+      }
+
+      const sent = await sock.sendMessage(jid, { text: finalText }, { quoted: msg, ...options });
       if (sent?.key?.id) {
         recordBotMsg(jid, sent.key.id, command, matchedPlugin?.category || 'general');
         historyList.push({
@@ -159,6 +165,27 @@ export async function messageHandler(sock, msg) {
         });
         if (historyList.length > 350) historyList.shift();
       }
+
+      // OPSI 2: Auto-Delete balasan bot & pesan user untuk perintah RPG di grup
+      if (isRpgGroup) {
+        const deleteDelay = typeof options.deleteDelay === 'number' ? options.deleteDelay : 15000;
+        setTimeout(async () => {
+          // 1. Hapus pesan balasan dari bot
+          try {
+            if (sent?.key) {
+              await sock.sendMessage(jid, { delete: sent.key });
+            }
+          } catch {}
+
+          // 2. Hapus pesan perintah dari user (jika bot adalah admin grup)
+          try {
+            if (msg?.key) {
+              await sock.sendMessage(jid, { delete: msg.key });
+            }
+          } catch {}
+        }, deleteDelay);
+      }
+
       return sent;
     };
 
