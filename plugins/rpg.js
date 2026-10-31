@@ -1940,16 +1940,18 @@ ${rewardSummary.join('\n\n')}
           return reply(`
 🎰 *KASINO MESIN SLOT KITSUNE* 🎰
 Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
+✨ _Peluang kemenangan telah ditingkatkan agar tidak sering rungkad!_
 
 📜 *Tabel Hadiah (3 Rel Kembar):*
 • 👑 👑 👑 ─ Jackpot Raja (*15x Taruhan*)
 • 💎 💎 💎 ─ Jackpot Berlian (*10x Taruhan*)
-• 7️⃣ 7️⃣ 7️⃣ ─ Lucky Seven (*7x Taruhan*)
-• 🔔 🔔 🔔 ─ Golden Bell (*5x Taruhan*)
-• 🍋 🍋 🍋 ─ Lemon Segar (*3x Taruhan*)
-• 🍇 🍇 🍇 ─ Anggur Manis (*2.5x Taruhan*)
-• 🍒 🍒 🍒 ─ Cherry Merah (*2x Taruhan*)
-• 2 Simbol Kembar ─ Hadiah Hiburan (*1.2x Taruhan*)
+• 7️⃣ 7️⃣ 7️⃣ ─ Lucky Seven (*8x Taruhan*)
+• 🔔 🔔 🔔 ─ Golden Bell (*6x Taruhan*)
+• 🍋 🍋 🍋 ─ Lemon Segar (*4x Taruhan*)
+• 🍇 🍇 🍇 ─ Anggur Manis (*3.5x Taruhan*)
+• 🍒 🍒 🍒 ─ Cherry Merah (*3x Taruhan*)
+• 2 Simbol Kembar ─ Hadiah Kemenangan (*1.5x Taruhan*)
+• 1 Simbol Hoki (👑/💎/7️⃣) ─ Balik Modal (*1.1x Taruhan*)
 
 💡 *Cara Main:*
 • \`${prefix}slot <taruhan>\` (Contoh: \`${prefix}slot 500\`)
@@ -1977,42 +1979,88 @@ Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
           return reply(`💸 Koin kamu tidak cukup!\nTaruhan: *${formatNumber(bet)} Gold* (Koinmu: ${formatNumber(user.money)} Gold).`);
         }
 
-        const symbols = [
-          { sym: '🍒', weight: 30, mult: 2.0, name: 'Cherry' },
-          { sym: '🍇', weight: 25, mult: 2.5, name: 'Anggur' },
-          { sym: '🍋', weight: 20, mult: 3.0, name: 'Lemon' },
-          { sym: '🔔', weight: 14, mult: 5.0, name: 'Golden Bell' },
-          { sym: '7️⃣', weight: 7,  mult: 7.0, name: 'Lucky Seven' },
-          { sym: '💎', weight: 3,  mult: 10.0, name: 'Berlian' },
-          { sym: '👑', weight: 1,  mult: 15.0, name: 'Mahkota Raja' },
+        const symbolList = [
+          { sym: '🍒', name: 'Cherry', mult: 3.0, jackpotWeight: 20 },
+          { sym: '🍇', name: 'Anggur', mult: 3.5, jackpotWeight: 18 },
+          { sym: '🍋', name: 'Lemon', mult: 4.0, jackpotWeight: 16 },
+          { sym: '🔔', name: 'Golden Bell', mult: 6.0, jackpotWeight: 14 },
+          { sym: '7️⃣', name: 'Lucky Seven', mult: 8.0, jackpotWeight: 12 },
+          { sym: '💎', name: 'Berlian', mult: 10.0, jackpotWeight: 8 },
+          { sym: '👑', name: 'Mahkota Raja', mult: 15.0, jackpotWeight: 4 },
         ];
 
-        const totalWeight = symbols.reduce((acc, s) => acc + s.weight, 0);
-        const pickSymbol = () => {
-          let r = Math.random() * totalWeight;
-          for (const s of symbols) {
-            if (r < s.weight) return s;
-            r -= s.weight;
-          }
-          return symbols[0];
-        };
-
-        const s1 = pickSymbol();
-        const s2 = pickSymbol();
-        const s3 = pickSymbol();
-
+        const roll = Math.random();
+        let s1, s2, s3;
         let isWin = false;
         let mult = 0;
         let winType = '';
 
-        if (s1.sym === s2.sym && s2.sym === s3.sym) {
+        if (roll < 0.18) {
+          // 1. TIER 1: JACKPOT 3 KEMBAR (18% Peluang)
+          const totalJpWeight = symbolList.reduce((acc, s) => acc + s.jackpotWeight, 0);
+          let r = Math.random() * totalJpWeight;
+          let picked = symbolList[0];
+          for (const s of symbolList) {
+            if (r < s.jackpotWeight) {
+              picked = s;
+              break;
+            }
+            r -= s.jackpotWeight;
+          }
+
+          s1 = picked;
+          s2 = picked;
+          s3 = picked;
           isWin = true;
-          mult = s1.mult;
-          winType = `🎉 *JACKPOT 3 KEMBAR! (${s1.name})*`;
-        } else if (s1.sym === s2.sym || s2.sym === s3.sym || s1.sym === s3.sym) {
+          mult = picked.mult;
+          winType = `🎉 *JACKPOT 3 KEMBAR! (${picked.name})*`;
+        } else if (roll < 0.63) {
+          // 2. TIER 2: 2 KEMBAR (45% Peluang - Untung Bersih +50%)
+          const matched = symbolList[Math.floor(Math.random() * symbolList.length)];
+          const others = symbolList.filter(s => s.sym !== matched.sym);
+          const diff = others[Math.floor(Math.random() * others.length)];
+          
+          const arrangement = Math.floor(Math.random() * 3);
+          if (arrangement === 0) {
+            s1 = matched; s2 = matched; s3 = diff;
+          } else if (arrangement === 1) {
+            s1 = matched; s2 = diff; s3 = matched;
+          } else {
+            s1 = diff; s2 = matched; s3 = matched;
+          }
+
           isWin = true;
-          mult = 1.2;
-          winType = `✨ *2 SIMBOL KEMBAR!* (Balik Modal + Bonus)`;
+          mult = 1.5;
+          winType = `✨ *2 SIMBOL KEMBAR! (${matched.name})*`;
+        } else if (roll < 0.75) {
+          // 3. TIER 3: SIMBOL HOKI (12% Peluang - Balik Modal 1.1x)
+          const luckyList = symbolList.filter(s => ['7️⃣', '💎', '👑'].includes(s.sym));
+          const lucky = luckyList[Math.floor(Math.random() * luckyList.length)];
+          const normalList = symbolList.filter(s => !['7️⃣', '💎', '👑'].includes(s.sym));
+          
+          const n1 = normalList[Math.floor(Math.random() * normalList.length)];
+          const remainingNormals = normalList.filter(s => s.sym !== n1.sym);
+          const n2 = remainingNormals[Math.floor(Math.random() * remainingNormals.length)];
+
+          const arrangement = Math.floor(Math.random() * 3);
+          if (arrangement === 0) {
+            s1 = lucky; s2 = n1; s3 = n2;
+          } else if (arrangement === 1) {
+            s1 = n1; s2 = lucky; s3 = n2;
+          } else {
+            s1 = n1; s2 = n2; s3 = lucky;
+          }
+
+          isWin = true;
+          mult = 1.1;
+          winType = `🌟 *SIMBOL HOKI (${lucky.name})!* (Balik Modal + 10%)`;
+        } else {
+          // 4. TIER 4: ZONK / RUNGKAD (Hanya 25% Peluang)
+          const shuffled = [...symbolList].sort(() => 0.5 - Math.random());
+          s1 = shuffled[0];
+          s2 = shuffled[1];
+          s3 = shuffled[2];
+          isWin = false;
         }
 
         let resultText = '';
