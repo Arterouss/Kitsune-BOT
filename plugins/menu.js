@@ -113,6 +113,7 @@ export default {
           { cmd: "tagraid", param: "", desc: "Ajak/tag teman serang boss" },
           { cmd: "pet", param: "", desc: "Status & adopsi pet companion" },
           { cmd: "feed", param: "[jumlah]", desc: "Beri makan pet agar buff aktif" },
+          { cmd: "token", param: "", desc: "Saldo mata uang langka Token Mistis" },
           { cmd: "bank", param: "", desc: "Brankas tabungan (Bunga 2%/hari)" },
           { cmd: "nabung", param: "<jumlah/all>", desc: "Setor uang dompet ke bank" },
           { cmd: "tarik", param: "<jumlah/all>", desc: "Tarik tabungan dari bank" },

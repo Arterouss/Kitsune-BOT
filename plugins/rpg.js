@@ -65,6 +65,7 @@ export default {
     'bank', 'nabung', 'depo', 'tarik', 'wd',
     'slot', 'spin', 'coinflip', 'cf',
     'pet', 'adopt', 'adopsi', 'feed', 'kasihmakan', 'renamepet',
+    'token', 'tokenmistis', 'koinmistis',
     'dbstatus', 'cekdb'
   ],
   category: 'rpg',
@@ -95,6 +96,7 @@ export default {
 ┃ 🎖️ *Pangkat:* ${user.title} (Lv. ${user.level})
 ┃ 💰 *Dompet:* ${formatNumber(user.money)} Gold
 ┃ 🏦 *Tabungan Bank:* ${formatNumber(user.bank || 0)} Gold
+┃ 🔮 *Token Mistis:* ${formatNumber(user.token || 0)} Token
 ┃
 ┃ ❤️ *HP:* [${hpBar}] ${user.hp}/${user.maxHp}
 ┃ ⚡ *Stamina:* [${staBar}] ${user.stamina}/${user.maxStamina}
@@ -131,6 +133,7 @@ export default {
 ╭━━━━━「 🎒 *TAS PENYIMPANAN* 」━━━━━╮
 ┃ 👤 *Pemilik:* ${user.name} (Lv. ${user.level})
 ┃ 💰 *Saldo Koin:* ${formatNumber(user.money)} Gold
+┃ 🔮 *Token Mistis:* ${formatNumber(user.token || 0)} Token
 ┃
 ┃ 🪵 *Hasil Alam & Tambang:*
 ┃  • Kayu Hutan: ${formatNumber(inv.kayu)}
@@ -316,6 +319,7 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         const dropEmas = Math.random() < 0.2 ? 1 : 0;
         const dropPotion = Math.random() < 0.15 ? 1 : 0;
         const dropMakananPet = Math.random() < 0.12 ? 1 : 0;
+        const dropTokenMistis = Math.random() < 0.05 ? 1 : 0;
 
         user.inventory.kayu += dropKayu;
         user.inventory.batu += dropBatu;
@@ -323,6 +327,7 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         user.inventory.emas += dropEmas;
         if (dropPotion) user.inventory.potion_hp += 1;
         if (dropMakananPet) user.inventory.makanan_pet = (user.inventory.makanan_pet || 0) + 1;
+        if (dropTokenMistis) user.token = (user.token || 0) + 1;
 
         user.money += goldGained;
         user.hp = Math.max(1, user.hp - rawDmg);
@@ -352,6 +357,7 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         if (dropEmas > 0) drops.push(`🪙 +${dropEmas} Bijih Emas`);
         if (dropPotion > 0) drops.push(`🧪 +1 Ramuan HP`);
         if (dropMakananPet > 0) drops.push(`🍖 +1 Makanan Pet`);
+        if (dropTokenMistis > 0) drops.push(`🔮 *SUPER RARE!* +1 Token Mistis Purba! ✨`);
 
         let text = `
 ⚔️ *PETUALANGAN SELESAI*
@@ -441,6 +447,7 @@ Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkanny
       const besiDapat = Math.floor(Math.random() * 3 * pickTier) + (Math.random() < 0.6 ? 1 : 0);
       const emasDapat = Math.random() < (0.2 * pickTier) ? Math.floor(Math.random() * 2) + 1 : 0;
       const berlianDapat = Math.random() < (0.05 * pickTier) ? 1 : 0;
+      const dropTokenMistis = Math.random() < 0.03 ? 1 : 0;
       const baseExp = Math.floor(Math.random() * 25) + 20;
       const expDapat = Math.floor(baseExp * (1 + ((petBuff.expPercent || 0) / 100)));
 
@@ -448,6 +455,7 @@ Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkanny
       user.inventory.besi += besiDapat;
       user.inventory.emas += emasDapat;
       user.inventory.berlian += berlianDapat;
+      if (dropTokenMistis) user.token = (user.token || 0) + 1;
       user.stats.minedCount += 1;
 
       // Pet ikut membantu menambang
@@ -469,6 +477,7 @@ Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkanny
       if (besiDapat > 0) hasil.push(`⚙️ +${besiDapat} Bijih Besi`);
       if (emasDapat > 0) hasil.push(`🪙 +${emasDapat} Bijih Emas murni!`);
       if (berlianDapat > 0) hasil.push(`💎 *JACKPOT!* +${berlianDapat} Berlian Langka! ✨`);
+      if (dropTokenMistis > 0) hasil.push(`🔮 *KRISTAL MISTIS!* +1 Token Mistis mengkristal! ✨`);
 
       let text = `
 ⛏️ *HASIL TAMBANG GUA MINERAL*
@@ -1088,9 +1097,9 @@ Berhasil membuat *${recipe.name}*!
     }
 
     // ──────────────────────────────────────────────────────────
-    // 10B. GACHA SENJATA EKSKLUSIF (.gacha / .pull / .tarik)
+    // 10B. GACHA SENJATA EKSKLUSIF (.gacha / .pull)
     // ──────────────────────────────────────────────────────────
-    if (['gacha', 'pull', 'tarik'].includes(command)) {
+    if (['gacha', 'pull'].includes(command)) {
       const mode = args?.trim().toLowerCase();
 
       if (!mode || (!['1', '10', 'single', 'multi'].includes(mode))) {
@@ -1172,6 +1181,10 @@ ${result.results.map((r, i) => `${i + 1}. ${r.text}`).join('\n')}
         replyMsg += `\n• Kurang *${remainingMythic} tarikan* lagi menuju Garansi 5★ Mythic!`;
         replyMsg += `\n• Kurang *${remainingEternal} tarikan* lagi menuju Garansi 6★ Eternal!`;
         replyMsg += `\n💡 Tarik lagi: \`${prefix}gacha ${times}\``;
+      }
+
+      if (result.bonusToken > 0) {
+        replyMsg += `\n\n🔮 *BONUS TARIKAN:* Mendapatkan *+${result.bonusToken} Token Mistis*! (Saldo: ${formatNumber(user.token || 0)} Token)`;
       }
 
       return reply(replyMsg);
@@ -1786,25 +1799,32 @@ ${bossCounterHeadline}
           expShare += 600;
           participantUser.inventory.berlian += (raid.drops.berlian || 2);
           participantUser.inventory.emas += (raid.drops.emas || 5);
-          dropItems.push(`💎 +${raid.drops.berlian || 2} Berlian`, `🪙 +${raid.drops.emas || 5} Emas`);
+          participantUser.token = (participantUser.token || 0) + 3;
+          dropItems.push(`💎 +${raid.drops.berlian || 2} Berlian`, `🪙 +${raid.drops.emas || 5} Emas`, `🔮 +3 Token Mistis`);
         } else if (i === 1) {
           // Peringkat 2
           goldShare += 1000;
           expShare += 300;
           participantUser.inventory.berlian += 1;
           participantUser.inventory.emas += 3;
-          dropItems.push(`💎 +1 Berlian`, `🪙 +3 Emas`);
+          participantUser.token = (participantUser.token || 0) + 2;
+          dropItems.push(`💎 +1 Berlian`, `🪙 +3 Emas`, `🔮 +2 Token Mistis`);
         } else if (i === 2) {
           // Peringkat 3
           goldShare += 500;
           expShare += 150;
           participantUser.inventory.emas += 2;
           participantUser.inventory.besi += 5;
-          dropItems.push(`🪙 +2 Emas`, `⚙️ +5 Besi`);
+          participantUser.token = (participantUser.token || 0) + 1;
+          dropItems.push(`🪙 +2 Emas`, `⚙️ +5 Besi`, `🔮 +1 Token Mistis`);
         } else {
           // Peserta Lainnya
           participantUser.inventory.besi += 3;
           dropItems.push(`⚙️ +3 Besi`);
+          if (Math.random() < 0.5) {
+            participantUser.token = (participantUser.token || 0) + 1;
+            dropItems.push(`🔮 +1 Token Mistis`);
+          }
         }
 
         participantUser.money += goldShare;
@@ -2177,7 +2197,7 @@ Koin dilempar ke udara dan mendarat di...
         if (!user.pet || !user.pet.type) {
           const petList = Object.values(PET_TYPES).map((p, i) => {
             return `*${i + 1}. ${p.name}*
-   💰 Biaya Adopsi: *${formatNumber(p.price)} Gold*
+   🔮 Biaya Adopsi: *${p.priceToken} Token Mistis*
    ✨ Efek Buff: _${p.desc}_
    👉 Adopsi: \`${prefix}adopt ${p.id} <nama>\``;
           }).join('\n\n');
@@ -2186,6 +2206,7 @@ Koin dilempar ke udara dan mendarat di...
 ╭━━━━━「 🐾 *PUSAT ADOPSI PET KITSUNE* 」━━━━━╮
 ┃ Rawat hewan pendamping setiamu untuk
 ┃ mendapatkan berbagai buff tempur & petualangan!
+┃ 🔮 *Token Mistis Kamu:* ${formatNumber(user.token || 0)} Token
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 ${petList}
@@ -2194,6 +2215,7 @@ ${petList}
 💡 *Cara Mengadopsi:*
 Ketik: \`${prefix}adopt <jenis> <nama_pet>\`
 Contoh: \`${prefix}adopt kitsune Shiro\` atau \`${prefix}adopt fenrir Kuro\`
+💡 _Ketik *${prefix}token* untuk info cara mendapatkan Token Mistis langka._
 `.trim();
 
           return reply(text);
@@ -2255,11 +2277,22 @@ Contoh: \`${prefix}adopt kitsune Shiro\` atau \`${prefix}adopt fenrir Kuro\`
           return reply(`⚠️ Harap beri nama untuk pet kamu!\nContoh: *${prefix}adopt ${petType} Shiro*`);
         }
 
-        if (user.money < petConfig.price) {
-          return reply(`💸 Koin tidak cukup!\nBiaya adopsi *${petConfig.name}*: *${formatNumber(petConfig.price)} Gold* (Koinmu: ${formatNumber(user.money)} Gold).`);
+        if ((user.token || 0) < petConfig.priceToken) {
+          return reply(`
+🔮 *TOKEN MISTIS TIDAK CUKUP!*
+Biaya adopsi *${petConfig.name}*: *${petConfig.priceToken} Token Mistis*
+Token kamu saat ini: *${formatNumber(user.token || 0)} Token* (Kurang ${petConfig.priceToken - (user.token || 0)} Token).
+
+💡 *Cara Mendapatkan Token Mistis Langka:*
+• 👹 Kalahkan World Boss Raid (*${prefix}raid* & *${prefix}serang*)
+• ⚔️ Peluang drop langka saat Bertualang (*${prefix}adv*)
+• ⛏️ Kristal mistis langka saat Menambang (*${prefix}mining*)
+• 🌌 Bonus Tarik 10x Gacha (*${prefix}gacha 10*)
+• 📜 Ketik *${prefix}token* untuk info lengkap.
+`.trim());
         }
 
-        user.money -= petConfig.price;
+        user.token -= petConfig.priceToken;
         user.pet = {
           type: petType,
           name: petName,
@@ -2274,12 +2307,13 @@ Contoh: \`${prefix}adopt kitsune Shiro\` atau \`${prefix}adopt fenrir Kuro\`
 
         return reply(`
 🎉 *SELAMAT! ADOPSI PET BERHASIL!*
-Kamu telah resmi mengadopsi *${petConfig.name}* dan memberinya nama *"${petName}"*!
+Kamu telah resmi mengadopsi *${petConfig.name}* dengan mahar *${petConfig.priceToken} Token Mistis* dan memberinya nama *"${petName}"*!
 
 🐾 *Stats Awal:*
 • Level: 1 (0/100 EXP)
 • Hunger: 100% (Kenyang & Siap tempur!)
 • Efek Buff: ${petConfig.desc}
+🔮 Sisa Token Mistis: *${formatNumber(user.token)} Token*
 
 💡 _Pet akan otomatis mendampingimu di *${prefix}adventure*, *${prefix}mining*, dan *${prefix}serang*!_
 💡 _Jangan lupa beri makan dengan *${prefix}feed* jika hunger berkurang._
@@ -2347,6 +2381,32 @@ Kamu memberi makan *${count}x Makanan Pet* kepada *${user.pet.name}*!
 
         return reply(`✨ Berhasil mengubah nama pet dari *"${oldName}"* menjadi *"${user.pet.name}"*!`);
       }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 20B. MATA UANG KHUSUS / TOKEN MISTIS (.token / .tokenmistis)
+    // ──────────────────────────────────────────────────────────
+    if (['token', 'tokenmistis', 'koinmistis'].includes(command)) {
+      const text = `
+╭━━━━━「 🔮 *TOKEN MISTIS KITSUNE* 」━━━━━╮
+┃ 👤 *Pemilik:* ${user.name}
+┃ 🔮 *Saldo Token:* ${formatNumber(user.token || 0)} Token Mistis
+┃ 💰 *Dompet Gold:* ${formatNumber(user.money)} Gold
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📖 *Apa itu Token Mistis?*
+Token Mistis adalah **mata uang langka & paling berharga** yang digunakan khusus untuk:
+• 🐾 Mengadopsi Hewan Pendamping (Pet Companion) di *${prefix}pet*
+• 🎁 Menukarkan item keramat & barang berharga langka di masa mendatang!
+
+⚔️ *Cara Mendapatkan Token Mistis Langka:*
+1. 👹 *World Boss Raid* (*${prefix}raid* & *${prefix}serang*) ─ Mengalahkan Boss Raid menghadiahkan hingga +3 Token Mistis!
+2. 🗺️ *Petualangan Dungeon* (*${prefix}adv*) ─ Peluang langka (5%) menemukan Token Purba saat mengalahkan monster!
+3. ⛏️ *Gua Mineral* (*${prefix}mining*) ─ Peluang langka (3%) menemukan kristal mistis saat menambang batu gua!
+4. 🌌 *Gacha 10x Pull* (*${prefix}gacha 10*) ─ Bonus pasti +1 Token Mistis setiap tarikan 10x!
+`.trim();
+
+      return reply(text);
     }
 
     // ──────────────────────────────────────────────────────────
