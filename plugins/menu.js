@@ -111,6 +111,18 @@ export default {
           { cmd: "raid", param: "", desc: "World Boss Raid monster raksasa" },
           { cmd: "serang", param: "", desc: "Pukul Boss Raid bersama anggota" },
           { cmd: "tagraid", param: "", desc: "Ajak/tag teman serang boss" },
+          { cmd: "pet", param: "", desc: "Status & adopsi pet companion" },
+          { cmd: "feed", param: "[jumlah]", desc: "Beri makan pet agar buff aktif" },
+          { cmd: "bank", param: "", desc: "Brankas tabungan (Bunga 2%/hari)" },
+          { cmd: "nabung", param: "<jumlah/all>", desc: "Setor uang dompet ke bank" },
+          { cmd: "tarik", param: "<jumlah/all>", desc: "Tarik tabungan dari bank" },
+        ],
+      },
+      {
+        category: "🎰 KASINO & MINI-GAMES",
+        items: [
+          { cmd: "slot", param: "<taruhan>", desc: "Mesin slot 3 rel (up to 15x)" },
+          { cmd: "cf", param: "<gambar/angka> <bet>", desc: "Tebak koin 50:50 (2x lipat)" },
         ],
       },
       {

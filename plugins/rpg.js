@@ -16,7 +16,10 @@ import {
   sellFromArmory,
   rollGacha,
   getDatabaseStatus,
-  recordBotMsg
+  recordBotMsg,
+  PET_TYPES,
+  getPetBuff,
+  addPetExp
 } from '../lib/rpg.js';
 
 // Global memory state for active group duels & boss raids
@@ -54,15 +57,18 @@ export default {
     'buy', 'beli',
     'sell', 'jual',
     'craft', 'tempa',
-    'gacha', 'pull', 'tarik',
+    'gacha', 'pull',
     'leaderboard', 'top', 'lb',
     'transfer', 'pay',
     'duel', 'pvp', 'terima', 'terimaduel', 'gas', 'tolak', 'tolakduel',
     'raid', 'boss', 'serang', 'hit', 'attack', 'cekkondisi', 'tagraid', 'ajakraid',
+    'bank', 'nabung', 'depo', 'tarik', 'wd',
+    'slot', 'spin', 'coinflip', 'cf',
+    'pet', 'adopt', 'adopsi', 'feed', 'kasihmakan', 'renamepet',
     'dbstatus', 'cekdb'
   ],
   category: 'rpg',
-  description: 'Sistem Petualangan RPG, Leveling, Mining, Toko, Duel PvP, dan Boss Raid',
+  description: 'Sistem Petualangan RPG, Pet Companion, Kasino, Bank, Leveling, Mining, Toko, Duel PvP, dan Boss Raid',
   async run({ sock, jid, msg, command, args, prefix, sender, senderName, isGroup, reply }) {
     const user = getUser(sender, senderName);
     const now = Date.now();
@@ -75,11 +81,20 @@ export default {
       const hpBar = renderBar(user.hp, user.maxHp, 8);
       const staBar = renderBar(user.stamina, user.maxStamina, 8);
 
+      let petInfo = `_Belum punya pet_ (Ketik *${prefix}pet*)`;
+      if (user.pet && user.pet.type) {
+        const petConfig = PET_TYPES[user.pet.type];
+        const petTypeName = petConfig?.name || user.pet.type;
+        const hungerStatus = (user.pet.hunger || 0) <= 0 ? '⚠️ *Kelaparan!*' : `${user.pet.hunger || 0}%`;
+        petInfo = `*${user.pet.name}* (${petTypeName} Lv. ${user.pet.level || 1})\n┃    └ 🍖 Hunger: [${renderBar(user.pet.hunger || 0, 100, 6)}] ${hungerStatus}`;
+      }
+
       const text = `
 ╭━━━━━「 👤 *PROFIL PETUALANG* 」━━━━━╮
 ┃ 🏷️ *Nama:* ${user.name}
 ┃ 🎖️ *Pangkat:* ${user.title} (Lv. ${user.level})
-┃ 💰 *Koin Emas:* ${formatNumber(user.money)} Gold
+┃ 💰 *Dompet:* ${formatNumber(user.money)} Gold
+┃ 🏦 *Tabungan Bank:* ${formatNumber(user.bank || 0)} Gold
 ┃
 ┃ ❤️ *HP:* [${hpBar}] ${user.hp}/${user.maxHp}
 ┃ ⚡ *Stamina:* [${staBar}] ${user.stamina}/${user.maxStamina}
@@ -88,6 +103,7 @@ export default {
 ┃ 🗡️ *Senjata:* ${user.equipment.weapon} (+${user.equipment.weaponAtk} ATK)
 ┃ 🛡️ *Zirah:* ${user.equipment.armor} (+${user.equipment.armorDef} DEF)
 ┃ ⛏️ *Beliung:* ${user.equipment.pickaxe}
+┃ 🐾 *Pet:* ${petInfo}
 ┃ 🎯 *Pity Mythic (5★):* ${user.gachaPity || 0}/120
 ┃ 🌌 *Pity Eternal (6★):* ${user.gachaPityEternal || 0}/500
 ┃
@@ -100,7 +116,7 @@ export default {
 ┃  • Total Tarikan Gacha: ${formatNumber(user.stats.gachaCount || 0)} kali
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-💡 _Ketik *${prefix}adventure* untuk bertualang atau *${prefix}inv* untuk cek tas._
+💡 _Ketik *${prefix}adventure* untuk bertualang, *${prefix}bank* untuk menabung, atau *${prefix}pet* untuk kelola hewan peliharaan._
 `.trim();
 
       return reply(text);
@@ -131,6 +147,7 @@ export default {
 ┃  • Kitab Pengalaman (+250 EXP): ${formatNumber(inv.kitab_exp)} buku
 ┃  • Jimat Pelindung (Anti Kalah): ${formatNumber(inv.jimat_pelindung)} buah
 ┃  • Tiket Boss Raid: ${formatNumber(inv.tiket_raid)} tiket
+┃  • Makanan Pet: ${formatNumber(inv.makanan_pet || 0)} porsi
 ┃
 ┃ ⚔️ *Perlengkapan Terpasang:*
 ┃  • ${user.equipment.weapon} (+${user.equipment.weaponAtk} ATK)
@@ -140,6 +157,7 @@ export default {
 
 💡 *Menu Interaksi:*
 • Ketik *${prefix}use <item>* untuk memakai item pendukung.
+• Ketik *${prefix}feed* untuk memberi makan pet peliharaanmu.
 • Ketik *${prefix}jual <nama/all>* untuk jual hasil tambang ke toko.
 • Ketik *${prefix}craft* untuk membuka bengkel tempa perlengkapan.
 • Ketik *${prefix}shop* untuk membeli ramuan & perlengkapan baru.
@@ -259,19 +277,24 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
       const eligibleMonsters = MONSTERS.filter(m => m.minLv <= user.level);
       const monster = eligibleMonsters[Math.floor(Math.random() * eligibleMonsters.length)] || MONSTERS[0];
 
+      // Dapatkan buff dari Pet pendamping (jika ada dan tidak lapar)
+      const petBuff = getPetBuff(user);
+
       // Simulasi pertarungan
       const weaponBonus = user.equipment.weaponAtk || 5;
-      const isPlayerCrit = Math.random() < 0.22;
-      const playerAtk = Math.floor(((user.level * 10) + weaponBonus + Math.floor(Math.random() * 25)) * (isPlayerCrit ? 1.5 : 1));
+      const isPlayerCrit = Math.random() < (0.22 + (petBuff.critBonus || 0));
+      const totalAtk = (user.level * 10) + weaponBonus + (petBuff.atkBonus || 0) + Math.floor(Math.random() * 25);
+      const playerAtk = Math.floor(totalAtk * (isPlayerCrit ? 1.5 : 1));
       const monsterHp = monster.baseHp;
 
-      // Hitung damage monster ke pemain (dikurangi Armor DEF)
+      // Hitung damage monster ke pemain (dikurangi Armor DEF + Pet DEF)
       const isMonsterCrit = Math.random() < 0.22;
       const monsterRoll = monster.atk + Math.floor(Math.random() * (monster.atk * 0.45));
       const rawMonsterAtk = isMonsterCrit ? Math.floor(monsterRoll * 1.45) : monsterRoll;
       const armorDef = user.equipment.armorDef || 2;
-      const mitigatedDmg = Math.max(Math.floor(rawMonsterAtk * 0.32), rawMonsterAtk - Math.floor(armorDef * 0.8));
-      const rawDmg = Math.max(10, Math.floor(mitigatedDmg + (Math.random() * 8) - 4));
+      const totalDef = armorDef + (petBuff.defBonus || 0);
+      const mitigatedDmg = Math.max(Math.floor(rawMonsterAtk * 0.28), rawMonsterAtk - Math.floor(totalDef * 0.8));
+      const rawDmg = Math.max(5, Math.floor(mitigatedDmg + (Math.random() * 8) - 4));
       
       // Pemain menang jika attack cukup
       const isWin = playerAtk >= (monsterHp * 0.4);
@@ -280,8 +303,11 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
       user.stamina -= 20;
 
       if (isWin) {
-        const expGained = Math.floor(Math.random() * (monster.expMax - monster.expMin + 1)) + monster.expMin;
-        const goldGained = Math.floor(Math.random() * (monster.goldMax - monster.goldMin + 1)) + monster.goldMin;
+        const baseExp = Math.floor(Math.random() * (monster.expMax - monster.expMin + 1)) + monster.expMin;
+        const baseGold = Math.floor(Math.random() * (monster.goldMax - monster.goldMin + 1)) + monster.goldMin;
+        
+        const expGained = Math.floor(baseExp * (1 + ((petBuff.expPercent || 0) / 100)));
+        const goldGained = Math.floor(baseGold * (1 + ((petBuff.goldPercent || 0) / 100)));
         
         // Drop bahan acak
         const dropKayu = Math.floor(Math.random() * 4) + 1;
@@ -289,17 +315,34 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         const dropBesi = Math.random() < 0.45 ? Math.floor(Math.random() * 2) + 1 : 0;
         const dropEmas = Math.random() < 0.2 ? 1 : 0;
         const dropPotion = Math.random() < 0.15 ? 1 : 0;
+        const dropMakananPet = Math.random() < 0.12 ? 1 : 0;
 
         user.inventory.kayu += dropKayu;
         user.inventory.batu += dropBatu;
         user.inventory.besi += dropBesi;
         user.inventory.emas += dropEmas;
         if (dropPotion) user.inventory.potion_hp += 1;
+        if (dropMakananPet) user.inventory.makanan_pet = (user.inventory.makanan_pet || 0) + 1;
 
         user.money += goldGained;
         user.hp = Math.max(1, user.hp - rawDmg);
         user.stats.adventures += 1;
         user.stats.monstersKilled += 1;
+
+        // Pet interaksi saat bertualang
+        let petNotes = [];
+        if (petBuff.isActive) {
+          user.pet.hunger = Math.max(0, (user.pet.hunger || 0) - 4);
+          const pLvl = addPetExp(user, 12);
+          if (pLvl.leveledUp) {
+            petNotes.push(`🐾 *${user.pet.name} LEVEL UP!* Naik ke Level ${pLvl.newLevel}!`);
+          }
+          if (user.pet.hunger <= 0) {
+            petNotes.push(`⚠️ *${user.pet.name} kelaparan!* Buff nonaktif sampai diberi makan (*${prefix}feed*).`);
+          }
+        } else if (petBuff.isHungry) {
+          petNotes.push(`💤 *${user.pet.name}* terlalu lapar untuk bertarung! Ketik *${prefix}feed* untuk memberinya makan.`);
+        }
 
         // Tambah EXP & Cek Level Up
         const lvlResult = addExp(user, expGained);
@@ -308,6 +351,7 @@ Saldo sekarang: *${formatNumber(user.money)} Gold*.`);
         if (dropBesi > 0) drops.push(`⚙️ +${dropBesi} Bijih Besi`);
         if (dropEmas > 0) drops.push(`🪙 +${dropEmas} Bijih Emas`);
         if (dropPotion > 0) drops.push(`🧪 +1 Ramuan HP`);
+        if (dropMakananPet > 0) drops.push(`🍖 +1 Makanan Pet`);
 
         let text = `
 ⚔️ *PETUALANGAN SELESAI*
@@ -317,12 +361,14 @@ Kamu melawan *${monster.name}* dan berhasil menang!
 ⚡ Stamina: -20 (Sisa: ${user.stamina}/${user.maxStamina})
 
 🎁 *Hadiah:*
-• 💰 +${formatNumber(goldGained)} Koin
-• 📈 +${expGained} EXP
+• 💰 +${formatNumber(goldGained)} Koin ${petBuff.goldPercent > 0 ? `_(+${petBuff.goldPercent}% Pet Buff)_` : ''}
+• 📈 +${expGained} EXP ${petBuff.expPercent > 0 ? `_(+${petBuff.expPercent}% Pet Buff)_` : ''}
 • ${drops.join('\n• ')}
-
-💡 _Balas pesan ini dengan *${prefix}del* untuk membersihkan chat._
 `.trim();
+
+        if (petNotes.length > 0) {
+          text += `\n\n${petNotes.join('\n')}`;
+        }
 
         if (lvlResult.leveledUp) {
           text += `\n\n🎉 *LEVEL UP!* Selamat, kamu naik ke *Level ${lvlResult.newLevel}*!\n⭐ Gelar Baru: *${user.title}*\n❤️ Max HP bertambah (+15) & darah pulih penuh!\n💰 Bonus Hadiah: +${formatNumber(lvlResult.bonusMoney)} Gold!`;
@@ -388,19 +434,34 @@ Kamu melawan *${monster.name}*, namun kekuatanmu belum cukup untuk mengalahkanny
       user.stamina -= 15;
 
       const pickTier = user.equipment.pickaxeTier || 1;
+      const petBuff = getPetBuff(user);
       
       // Hasil tambang tergantung tier beliung
       const batuDapat = Math.floor(Math.random() * 6 * pickTier) + 3;
       const besiDapat = Math.floor(Math.random() * 3 * pickTier) + (Math.random() < 0.6 ? 1 : 0);
       const emasDapat = Math.random() < (0.2 * pickTier) ? Math.floor(Math.random() * 2) + 1 : 0;
       const berlianDapat = Math.random() < (0.05 * pickTier) ? 1 : 0;
-      const expDapat = Math.floor(Math.random() * 25) + 20;
+      const baseExp = Math.floor(Math.random() * 25) + 20;
+      const expDapat = Math.floor(baseExp * (1 + ((petBuff.expPercent || 0) / 100)));
 
       user.inventory.batu += batuDapat;
       user.inventory.besi += besiDapat;
       user.inventory.emas += emasDapat;
       user.inventory.berlian += berlianDapat;
       user.stats.minedCount += 1;
+
+      // Pet ikut membantu menambang
+      let petNotes = [];
+      if (petBuff.isActive) {
+        user.pet.hunger = Math.max(0, (user.pet.hunger || 0) - 3);
+        const pLvl = addPetExp(user, 10);
+        if (pLvl.leveledUp) {
+          petNotes.push(`🐾 *${user.pet.name} LEVEL UP!* Naik ke Level ${pLvl.newLevel}!`);
+        }
+        if (user.pet.hunger <= 0) {
+          petNotes.push(`⚠️ *${user.pet.name} kelaparan!* Beri makan dengan *${prefix}feed*.`);
+        }
+      }
 
       const lvlResult = addExp(user, expDapat);
 
@@ -415,9 +476,13 @@ Kamu mengayunkan *${user.equipment.pickaxe}* ke dinding batu gua yang dalam...
 
 📦 *Material Ditemukan:*
 • ${hasil.join('\n• ')}
-• 📈 +${expDapat} EXP
+• 📈 +${expDapat} EXP ${petBuff.expPercent > 0 ? `_(+${petBuff.expPercent}% Pet Buff)_` : ''}
 ⚡ Stamina terpakai: -15 (Sisa: ${user.stamina}/${user.maxStamina})
 `.trim();
+
+      if (petNotes.length > 0) {
+        text += `\n\n${petNotes.join('\n')}`;
+      }
 
       if (lvlResult.leveledUp) {
         text += `\n\n🎉 *LEVEL UP!* Level ${lvlResult.newLevel} diraih!\nMax HP & Stamina meningkat penuh!`;
@@ -499,6 +564,7 @@ Contoh: *${prefix}use kitab_exp 10* atau *${prefix}use potion_hp 5*
 • \`${prefix}use potion_stamina [jumlah]\` ─ Minum Ramuan Stamina (+60 Stamina/botol)
 • \`${prefix}use potion_stamina_besar [jumlah]\` ─ Minum Ramuan Stamina Besar (+120 Stamina/botol)
 • \`${prefix}use kitab_exp [jumlah]\` ─ Membaca Kitab Pengalaman (+250 EXP/buku)
+• \`${prefix}use makanan_pet [jumlah]\` ─ Memberi makan pet (+25 Hunger & +20 EXP)
 • \`${prefix}use tiket_raid\` ─ Reset Cooldown World Boss grup
 • \`${prefix}use jimat_pelindung\` ─ Cek status perlindungan jimat
 `.trim());
@@ -679,6 +745,40 @@ Jika kamu kalah saat bertarung, jimat ini akan otomatis pecah melindungi nyawamu
 📦 Koleksimu saat ini: *${user.inventory.jimat_pelindung || 0} buah*.`);
       }
 
+      // 8. Makanan Pet
+      if (['makanan_pet', 'makananpet', 'pet_food', 'makanan'].includes(itemKey)) {
+        if (!user.pet || !user.pet.type) {
+          return reply(`⚠️ Kamu belum memiliki pet companion!\nAdopsi pet terlebih dahulu dengan mengetik *${prefix}pet*.`);
+        }
+        const available = user.inventory.makanan_pet || 0;
+        if (available <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Makanan Pet* di tas! Beli di *${prefix}shop* seharga 150 Gold.`);
+        }
+        if ((user.pet.hunger || 0) >= 100) {
+          return reply(`🍖 *${user.pet.name}* masih sangat kenyang (Hunger: 100%)!\nBawa dia bertualang dulu sebelum diberi makan lagi.`);
+        }
+        const needed = Math.ceil((100 - (user.pet.hunger || 0)) / 25);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
+        user.inventory.makanan_pet -= count;
+        user.pet.hunger = Math.min(100, (user.pet.hunger || 0) + (count * 25));
+        const petLvl = addPetExp(user, count * 20);
+        saveRpgDb();
+
+        let feedText = `🍖 *NYAM NYAM NYAM~!*
+Kamu memberi makan *${count}x Makanan Pet* kepada *${user.pet.name}*!
+🍖 Hunger pulih: *${user.pet.hunger}/100%*
+📈 EXP Pet: *+${count * 20} EXP* (${user.pet.exp}/${user.pet.maxExp})
+📦 Sisa Makanan Pet di tas: ${user.inventory.makanan_pet} porsi`;
+
+        if (petLvl.leveledUp) {
+          feedText += `\n\n🎉 *PET LEVEL UP!* *${user.pet.name}* naik ke *Level ${petLvl.newLevel}*!\nKekuatan buff pet meningkat drastis!`;
+        }
+
+        return reply(feedText);
+      }
+
       return reply(`❌ Item *"${args}"* tidak dikenali atau tidak bisa dipakai!\nKetik *${prefix}use* untuk melihat panduan item.`);
     }
 
@@ -696,8 +796,12 @@ Jika kamu kalah saat bertarung, jimat ini akan otomatis pecah melindungi nyawamu
       user.cooldowns.daily = now;
       const rewardMoney = 1000 + (user.level * 100);
       const rewardExp = 60 + (user.level * 15);
+      const bankInterest = Math.floor((user.bank || 0) * 0.02);
 
       user.money += rewardMoney;
+      if (bankInterest > 0) {
+        user.bank += bankInterest;
+      }
       user.inventory.potion_hp = (user.inventory.potion_hp || 0) + 2;
       user.inventory.potion_stamina = (user.inventory.potion_stamina || 0) + 1;
       user.hp = user.maxHp;
@@ -711,7 +815,7 @@ Terima kasih sudah setia berpetualang bersama Kitsune Bot!
 
 📦 *Hadiah yang didapat:*
 • 💰 +${formatNumber(rewardMoney)} Koin Emas
-• 📈 +${rewardExp} EXP
+${bankInterest > 0 ? `• 🏦 +${formatNumber(bankInterest)} Gold (Bunga Deposito Bank 2%)\n` : ''}• 📈 +${rewardExp} EXP
 • 🧪 +2 Ramuan HP
 • ⚡ +1 Ramuan Stamina
 • ❤️ HP & ⚡ Stamina dipulihkan sampai penuh (100%)!
@@ -1568,14 +1672,17 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       // Kurangi stamina
       user.stamina -= 10;
 
-      // 1. Hitung damage pemain ke boss (skala Senjata & Critical Hit)
+      // Ambil buff pet aktif
+      const petBuff = getPetBuff(user);
+
+      // 1. Hitung damage pemain ke boss (skala Senjata & Critical Hit + Pet ATK)
       const weaponBonus = user.equipment.weaponAtk || 5;
-      const isPlayerCrit = Math.random() < 0.25; // 25% peluang Critical Hit
+      const isPlayerCrit = Math.random() < (0.25 + (petBuff.critBonus || 0)); // 25% + Pet Crit
       const critMultiplier = isPlayerCrit ? (1.75 + (Math.random() * 0.5)) : 1.0;
-      const basePlayerDmg = (user.level * 22) + (weaponBonus * 2.2) + Math.floor(Math.random() * 50) + 40;
+      const basePlayerDmg = (user.level * 22) + (weaponBonus * 2.2) + (petBuff.atkBonus * 1.5) + Math.floor(Math.random() * 50) + 40;
       const playerDmg = Math.floor(basePlayerDmg * critMultiplier);
 
-      // 2. Serangan balik boss ke pemain (dengan variasi skill boss & zirah)
+      // 2. Serangan balik boss ke pemain (dengan variasi skill boss & zirah + Pet DEF)
       const skills = raid.skills || ["Hantaman Mematikan", "Cakaran Badai", "Guncangan Gempa"];
       const skillName = skills[Math.floor(Math.random() * skills.length)];
       
@@ -1583,11 +1690,18 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
       const bossMult = isBossCrit ? (1.4 + (Math.random() * 0.4)) : (0.85 + (Math.random() * 0.35));
       const rawBossAtk = Math.floor(raid.atk * bossMult);
       const armorBonus = user.equipment.armorDef || 2;
+      const totalArmor = armorBonus + (petBuff.defBonus || 0);
       
-      // Zirah meredam serangan, namun tetap ada chip damage proporsional (tidak pernah konstan 5)
-      const mitigatedDmg = Math.max(Math.floor(rawBossAtk * 0.32), rawBossAtk - Math.floor(armorBonus * 0.8));
-      const counterDmg = Math.max(15, Math.floor(mitigatedDmg + (Math.random() * 12) - 6));
+      // Zirah & Pet meredam serangan
+      const mitigatedDmg = Math.max(Math.floor(rawBossAtk * 0.28), rawBossAtk - Math.floor(totalArmor * 0.8));
+      const counterDmg = Math.max(12, Math.floor(mitigatedDmg + (Math.random() * 12) - 6));
       user.hp = Math.max(1, user.hp - counterDmg);
+
+      // Pet beraksi saat raid
+      if (petBuff.isActive) {
+        user.pet.hunger = Math.max(0, (user.pet.hunger || 0) - 2);
+        addPetExp(user, 15);
+      }
 
       // Catat kontribusi
       if (!raid.contributors[sender]) {
@@ -1719,7 +1833,491 @@ ${rewardSummary.join('\n\n')}
     }
 
     // ──────────────────────────────────────────────────────────
-    // 19. STATUS DATABASE & PENYIMPANAN DATA (.dbstatus / .cekdb)
+    // 18. BANK PETUALANG (.bank / .nabung / .depo / .tarik / .wd)
+    // ──────────────────────────────────────────────────────────
+    if (['bank', 'nabung', 'depo', 'tarik', 'wd'].includes(command)) {
+      user.bank = typeof user.bank === 'number' ? user.bank : 0;
+
+      // Cek Saldo Bank (.bank)
+      if (command === 'bank') {
+        const text = `
+╭━━━━━「 🏦 *BANK PETUALANG KITSUNE* 」━━━━━╮
+┃ 👤 *Nasabah:* ${user.name}
+┃ 💰 *Dompet (Gold):* ${formatNumber(user.money)} Gold
+┃ 🏦 *Tabungan Bank:* ${formatNumber(user.bank)} Gold
+┃ 📈 *Bunga Deposito:* 2% setiap klaim *${prefix}daily*
+┃ 🛡️ *Keamanan:* 100% Kebal dari Duel & Kematian
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+💡 *Menu Transaksi:*
+• \`${prefix}nabung <jumlah/all>\` ─ Setor uang ke brankas bank
+• \`${prefix}tarik <jumlah/all>\` ─ Tarik uang tunai ke dompet
+• \`${prefix}daily\` ─ Ambil jatah harian & bunga deposito bank
+`.trim();
+
+        return reply(text);
+      }
+
+      // Menyetor Uang ke Bank (.nabung / .depo)
+      if (['nabung', 'depo'].includes(command)) {
+        if (!args) {
+          return reply(`⚠️ Masukkan nominal koin yang ingin ditabung!\nContoh: *${prefix}nabung 1000* atau *${prefix}nabung all*`);
+        }
+
+        const cleanArg = args.trim().toLowerCase();
+        let amount = 0;
+
+        if (cleanArg === 'all' || cleanArg === 'semua') {
+          amount = user.money;
+        } else {
+          amount = parseInt(cleanArg.replace(/[^0-9]/g, ''));
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+          return reply('⚠️ Nominal setoran harus berupa angka positif!');
+        }
+
+        if (user.money < amount) {
+          return reply(`💸 Saldo dompetmu tidak cukup!\nDompetmu: *${formatNumber(user.money)} Gold*, ingin setor: *${formatNumber(amount)} Gold*.`);
+        }
+
+        user.money -= amount;
+        user.bank += amount;
+        saveRpgDb();
+
+        return reply(`
+🏦 *SETORAN BANK BERHASIL!*
+💵 Disetor ke Bank: *+${formatNumber(amount)} Gold*
+🏦 Saldo Tabungan: *${formatNumber(user.bank)} Gold*
+💰 Sisa di Dompet: *${formatNumber(user.money)} Gold*
+✨ _Uang di bank aman dari kekalahan duel PvP & petualangan!_
+`.trim());
+      }
+
+      // Menarik Uang dari Bank (.tarik / .wd)
+      if (['tarik', 'wd'].includes(command)) {
+        if (!args) {
+          return reply(`⚠️ Masukkan nominal koin yang ingin ditarik!\nContoh: *${prefix}tarik 1000* atau *${prefix}tarik all*`);
+        }
+
+        const cleanArg = args.trim().toLowerCase();
+        let amount = 0;
+
+        if (cleanArg === 'all' || cleanArg === 'semua') {
+          amount = user.bank;
+        } else {
+          amount = parseInt(cleanArg.replace(/[^0-9]/g, ''));
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+          return reply('⚠️ Nominal penarikan harus berupa angka positif!');
+        }
+
+        if (user.bank < amount) {
+          return reply(`💸 Saldo di bank tidak cukup!\nTabunganmu: *${formatNumber(user.bank)} Gold*, ingin ditarik: *${formatNumber(amount)} Gold*.`);
+        }
+
+        user.bank -= amount;
+        user.money += amount;
+        saveRpgDb();
+
+        return reply(`
+🏦 *PENARIKAN BANK BERHASIL!*
+💵 Ditarik ke Dompet: *+${formatNumber(amount)} Gold*
+💰 Saldo Dompet: *${formatNumber(user.money)} Gold*
+🏦 Sisa Tabungan Bank: *${formatNumber(user.bank)} Gold*
+`.trim());
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 19. KASINO & MINI-GAMES (.slot / .spin / .coinflip / .cf)
+    // ──────────────────────────────────────────────────────────
+    if (['slot', 'spin', 'coinflip', 'cf'].includes(command)) {
+      // 1. GAME SLOT MACHINE (.slot / .spin)
+      if (['slot', 'spin'].includes(command)) {
+        if (!args) {
+          return reply(`
+🎰 *KASINO MESIN SLOT KITSUNE* 🎰
+Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
+
+📜 *Tabel Hadiah (3 Rel Kembar):*
+• 👑 👑 👑 ─ Jackpot Raja (*15x Taruhan*)
+• 💎 💎 💎 ─ Jackpot Berlian (*10x Taruhan*)
+• 7️⃣ 7️⃣ 7️⃣ ─ Lucky Seven (*7x Taruhan*)
+• 🔔 🔔 🔔 ─ Golden Bell (*5x Taruhan*)
+• 🍋 🍋 🍋 ─ Lemon Segar (*3x Taruhan*)
+• 🍇 🍇 🍇 ─ Anggur Manis (*2.5x Taruhan*)
+• 🍒 🍒 🍒 ─ Cherry Merah (*2x Taruhan*)
+• 2 Simbol Kembar ─ Hadiah Hiburan (*1.2x Taruhan*)
+
+💡 *Cara Main:*
+• \`${prefix}slot <taruhan>\` (Contoh: \`${prefix}slot 500\`)
+• Minimal taruhan: *50 Gold* | Maksimal: *50.000 Gold*
+`.trim());
+        }
+
+        const cleanArg = args.trim().toLowerCase();
+        let bet = 0;
+        if (cleanArg === 'all' || cleanArg === 'semua') {
+          bet = Math.min(user.money, 50000);
+        } else {
+          bet = parseInt(cleanArg.replace(/[^0-9]/g, ''));
+        }
+
+        if (isNaN(bet) || bet < 50) {
+          return reply('⚠️ Minimal taruhan slot adalah *50 Gold*!');
+        }
+
+        if (bet > 50000) {
+          return reply('⚠️ Maksimal taruhan slot adalah *50.000 Gold* demi keamanan finansialmu!');
+        }
+
+        if (user.money < bet) {
+          return reply(`💸 Koin kamu tidak cukup!\nTaruhan: *${formatNumber(bet)} Gold* (Koinmu: ${formatNumber(user.money)} Gold).`);
+        }
+
+        const symbols = [
+          { sym: '🍒', weight: 30, mult: 2.0, name: 'Cherry' },
+          { sym: '🍇', weight: 25, mult: 2.5, name: 'Anggur' },
+          { sym: '🍋', weight: 20, mult: 3.0, name: 'Lemon' },
+          { sym: '🔔', weight: 14, mult: 5.0, name: 'Golden Bell' },
+          { sym: '7️⃣', weight: 7,  mult: 7.0, name: 'Lucky Seven' },
+          { sym: '💎', weight: 3,  mult: 10.0, name: 'Berlian' },
+          { sym: '👑', weight: 1,  mult: 15.0, name: 'Mahkota Raja' },
+        ];
+
+        const totalWeight = symbols.reduce((acc, s) => acc + s.weight, 0);
+        const pickSymbol = () => {
+          let r = Math.random() * totalWeight;
+          for (const s of symbols) {
+            if (r < s.weight) return s;
+            r -= s.weight;
+          }
+          return symbols[0];
+        };
+
+        const s1 = pickSymbol();
+        const s2 = pickSymbol();
+        const s3 = pickSymbol();
+
+        let isWin = false;
+        let mult = 0;
+        let winType = '';
+
+        if (s1.sym === s2.sym && s2.sym === s3.sym) {
+          isWin = true;
+          mult = s1.mult;
+          winType = `🎉 *JACKPOT 3 KEMBAR! (${s1.name})*`;
+        } else if (s1.sym === s2.sym || s2.sym === s3.sym || s1.sym === s3.sym) {
+          isWin = true;
+          mult = 1.2;
+          winType = `✨ *2 SIMBOL KEMBAR!* (Balik Modal + Bonus)`;
+        }
+
+        let resultText = '';
+        if (isWin) {
+          const totalWon = Math.floor(bet * mult);
+          const netProfit = totalWon - bet;
+          user.money += netProfit;
+          resultText = `
+${winType}
+💰 Menang Hadiah: *+${formatNumber(totalWon)} Gold* (Pengali ${mult}x)!
+📈 Laba Bersih: *+${formatNumber(netProfit)} Gold*
+Saldo Kamu Sekarang: *${formatNumber(user.money)} Gold*
+`.trim();
+        } else {
+          user.money -= bet;
+          resultText = `
+💀 *ZONK! Kamu belum beruntung.*
+💸 Kehilangan taruhan: *-${formatNumber(bet)} Gold*
+Sisa Saldo Kamu: *${formatNumber(user.money)} Gold*
+`.trim();
+        }
+
+        saveRpgDb();
+
+        const slotVisual = `
+🎰━━━━━「 *KASINO SLOT KITSUNE* 」━━━━━🎰
+┃
+┃   ┌───────────────────────────┐
+┃   │   [  ${s1.sym}   |   ${s2.sym}   |   ${s3.sym}  ]   │
+┃   └───────────────────────────┘
+┃
+${resultText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Putar lagi: \`${prefix}slot ${bet}\`
+`.trim();
+
+        return reply(slotVisual);
+      }
+
+      // 2. COIN FLIP (.coinflip / .cf)
+      if (['coinflip', 'cf'].includes(command)) {
+        const tokens = (args || '').trim().split(/\s+/);
+        if (tokens.length < 2) {
+          return reply(`
+🪙 *KASINO LEMPAR KOIN (50:50)* 🪙
+Pilih satu sisi koin dan gandakan taruhanmu!
+
+💡 *Format Perintah:*
+\`${prefix}coinflip <gambar/angka> <taruhan>\`
+Contoh:
+• \`${prefix}cf gambar 1000\`
+• \`${prefix}cf angka 500\`
+
+📊 Peluang Menang: *50:50* (Menang dapat *2x Lipat*!)
+💵 Minimal: *50 Gold* | Maksimal: *50.000 Gold*
+`.trim());
+        }
+
+        let choice = '';
+        let bet = 0;
+
+        for (const t of tokens) {
+          const lower = t.toLowerCase();
+          if (['gambar', 'g', 'head', 'heads'].includes(lower)) {
+            choice = 'gambar';
+          } else if (['angka', 'a', 'tail', 'tails'].includes(lower)) {
+            choice = 'angka';
+          } else if (lower === 'all' || lower === 'semua') {
+            bet = Math.min(user.money, 50000);
+          } else if (!isNaN(parseInt(lower))) {
+            bet = parseInt(lower);
+          }
+        }
+
+        if (!choice) {
+          return reply('⚠️ Pilih sisi koin: *gambar* atau *angka*!\nContoh: *' + prefix + 'cf gambar 500*');
+        }
+
+        if (isNaN(bet) || bet < 50) {
+          return reply('⚠️ Minimal taruhan coin flip adalah *50 Gold*!');
+        }
+
+        if (bet > 50000) {
+          return reply('⚠️ Maksimal taruhan coin flip adalah *50.000 Gold*!');
+        }
+
+        if (user.money < bet) {
+          return reply(`💸 Koinmu tidak cukup!\nTaruhan: *${formatNumber(bet)} Gold* (Koinmu: ${formatNumber(user.money)} Gold).`);
+        }
+
+        const coinResult = Math.random() < 0.5 ? 'gambar' : 'angka';
+        const coinIcon = coinResult === 'gambar' ? '🦅 (Gambar)' : '🔢 (Angka)';
+        const isPlayerWin = choice === coinResult;
+
+        if (isPlayerWin) {
+          user.money += bet;
+          saveRpgDb();
+          return reply(`
+🪙━━━━━「 *COIN FLIP MENANG!* 」━━━━━🪙
+Koin dilempar ke udara dan mendarat di...
+👉 *${coinIcon}*
+
+🎉 Tebakanmu tepat (*${choice.toUpperCase()}*)!
+💰 Kamu memenangkan: *+${formatNumber(bet)} Gold* (Total dapat *${formatNumber(bet * 2)} Gold*)!
+💵 Saldo kamu sekarang: *${formatNumber(user.money)} Gold*.
+`.trim());
+        } else {
+          user.money -= bet;
+          saveRpgDb();
+          return reply(`
+🪙━━━━━「 *COIN FLIP KALAH!* 」━━━━━🪙
+Koin dilempar ke udara dan mendarat di...
+👉 *${coinIcon}*
+
+💀 Tebakanmu meleset (Kamu memilih *${choice.toUpperCase()}*)!
+💸 Kehilangan taruhan: *-${formatNumber(bet)} Gold*.
+💵 Sisa saldo kamu: *${formatNumber(user.money)} Gold*.
+`.trim());
+        }
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 20. PET COMPANION SYSTEM (.pet / .adopt / .feed / .renamepet)
+    // ──────────────────────────────────────────────────────────
+    if (['pet', 'adopt', 'adopsi', 'feed', 'kasihmakan', 'renamepet'].includes(command)) {
+      // 1. STATUS PET & PUSAT ADOPSI (.pet)
+      if (command === 'pet') {
+        if (!user.pet || !user.pet.type) {
+          const petList = Object.values(PET_TYPES).map((p, i) => {
+            return `*${i + 1}. ${p.name}*
+   💰 Biaya Adopsi: *${formatNumber(p.price)} Gold*
+   ✨ Efek Buff: _${p.desc}_
+   👉 Adopsi: \`${prefix}adopt ${p.id} <nama>\``;
+          }).join('\n\n');
+
+          const text = `
+╭━━━━━「 🐾 *PUSAT ADOPSI PET KITSUNE* 」━━━━━╮
+┃ Rawat hewan pendamping setiamu untuk
+┃ mendapatkan berbagai buff tempur & petualangan!
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+${petList}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *Cara Mengadopsi:*
+Ketik: \`${prefix}adopt <jenis> <nama_pet>\`
+Contoh: \`${prefix}adopt kitsune Shiro\` atau \`${prefix}adopt fenrir Kuro\`
+`.trim();
+
+          return reply(text);
+        }
+
+        const pet = user.pet;
+        const petConfig = PET_TYPES[pet.type] || PET_TYPES.kitsune;
+        const buff = petConfig.getBuff(pet.level || 1);
+        const expBar = renderBar(pet.exp || 0, pet.maxExp || 100, 8);
+        const hungerBar = renderBar(pet.hunger || 0, 100, 8);
+
+        const isHungry = (pet.hunger || 0) <= 0;
+        const statusBuff = isHungry 
+          ? '❌ *NONAKTIF (Pet Kelaparan!)*' 
+          : '✅ *AKTIF (Memberikan Buff)*';
+
+        const text = `
+╭━━━━━「 🐾 *STATUS PET COMPANION* 」━━━━━╮
+┃ 🏷️ *Nama:* ${pet.name}
+┃ 🧬 *Ras:* ${petConfig.name}
+┃ 🎖️ *Level:* Lv. ${pet.level || 1}
+┃ 📊 *EXP:* [${expBar}] ${pet.exp || 0}/${pet.maxExp || 100}
+┃ 🍖 *Hunger:* [${hungerBar}] ${pet.hunger || 0}/100%
+┃
+┃ 🌟 *Status Buff:* ${statusBuff}
+┃  • 🗡️ Bonus ATK: *+${buff.atkBonus} ATK*
+┃  • 🛡️ Bonus DEF: *+${buff.defBonus} DEF*
+┃  • 📈 Bonus EXP: *+${buff.expPercent}% EXP*
+┃  • 💰 Bonus Gold: *+${buff.goldPercent}% Gold*
+┃  • 🔥 Serangan Kritis: *+${Math.round((buff.critBonus || 0) * 100)}% Crit*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+💡 *Menu Interaksi Pet:*
+• \`${prefix}feed [jumlah]\` ─ Beri makan pet (1 Makanan = +25 Hunger & +20 EXP)
+• \`${prefix}renamepet <nama>\` ─ Mengganti nama panggilan pet
+• \`${prefix}adopt <jenis> <nama>\` ─ Ganti dengan ras pet baru
+`.trim();
+
+        return reply(text);
+      }
+
+      // 2. ADOPSI PET BARU (.adopt / .adopsi)
+      if (['adopt', 'adopsi'].includes(command)) {
+        if (!args) {
+          return reply(`⚠️ Masukkan ras pet dan nama yang diinginkan!\nContoh: *${prefix}adopt kitsune Shiro*\nKetik *${prefix}pet* untuk melihat jenis ras dan harganya.`);
+        }
+
+        const parts = args.trim().split(/\s+/);
+        const petType = parts[0]?.toLowerCase();
+        const petName = parts.slice(1).join(' ').trim();
+
+        const petConfig = PET_TYPES[petType];
+        if (!petConfig) {
+          const avail = Object.keys(PET_TYPES).join(', ');
+          return reply(`❌ Ras pet *"${petType}"* tidak dikenali!\nPilihan yang tersedia: *${avail}*.\nKetik *${prefix}pet* untuk info detail.`);
+        }
+
+        if (!petName) {
+          return reply(`⚠️ Harap beri nama untuk pet kamu!\nContoh: *${prefix}adopt ${petType} Shiro*`);
+        }
+
+        if (user.money < petConfig.price) {
+          return reply(`💸 Koin tidak cukup!\nBiaya adopsi *${petConfig.name}*: *${formatNumber(petConfig.price)} Gold* (Koinmu: ${formatNumber(user.money)} Gold).`);
+        }
+
+        user.money -= petConfig.price;
+        user.pet = {
+          type: petType,
+          name: petName,
+          level: 1,
+          exp: 0,
+          maxExp: 100,
+          hunger: 100,
+          adoptedAt: now,
+        };
+
+        saveRpgDb();
+
+        return reply(`
+🎉 *SELAMAT! ADOPSI PET BERHASIL!*
+Kamu telah resmi mengadopsi *${petConfig.name}* dan memberinya nama *"${petName}"*!
+
+🐾 *Stats Awal:*
+• Level: 1 (0/100 EXP)
+• Hunger: 100% (Kenyang & Siap tempur!)
+• Efek Buff: ${petConfig.desc}
+
+💡 _Pet akan otomatis mendampingimu di *${prefix}adventure*, *${prefix}mining*, dan *${prefix}serang*!_
+💡 _Jangan lupa beri makan dengan *${prefix}feed* jika hunger berkurang._
+`.trim());
+      }
+
+      // 3. MEMBERI MAKAN PET (.feed / .kasihmakan)
+      if (['feed', 'kasihmakan'].includes(command)) {
+        if (!user.pet || !user.pet.type) {
+          return reply(`⚠️ Kamu belum memiliki pet companion!\nAdopsi pet dulu dengan mengetik *${prefix}pet*.`);
+        }
+
+        const available = user.inventory.makanan_pet || 0;
+        if (available <= 0) {
+          return reply(`❌ Kamu tidak memiliki *Makanan Pet* di tas!\nBeli di *${prefix}shop* seharga 150 Gold.`);
+        }
+
+        if ((user.pet.hunger || 0) >= 100) {
+          return reply(`🍖 *${user.pet.name}* masih sangat kenyang (Hunger: 100%)!\nBawa dia bertualang (*${prefix}adventure*) dulu sebelum memberinya makan lagi.`);
+        }
+
+        let rawCount = 1;
+        const argStr = (args || '').trim().toLowerCase();
+        if (argStr === 'all' || argStr === 'semua') {
+          rawCount = 'all';
+        } else if (!isNaN(parseInt(argStr)) && parseInt(argStr) > 0) {
+          rawCount = parseInt(argStr);
+        }
+
+        const needed = Math.ceil((100 - (user.pet.hunger || 0)) / 25);
+        let count = rawCount === 'all' ? Math.min(available, needed) : Math.min(parseInt(rawCount) || 1, available);
+        if (count <= 0) count = 1;
+
+        user.inventory.makanan_pet -= count;
+        user.pet.hunger = Math.min(100, (user.pet.hunger || 0) + (count * 25));
+        const petLvl = addPetExp(user, count * 20);
+        saveRpgDb();
+
+        let feedText = `🍖 *NYAM NYAM NYAM~!*
+Kamu memberi makan *${count}x Makanan Pet* kepada *${user.pet.name}*!
+🍖 Sisa Hunger: *${user.pet.hunger}/100%*
+📈 EXP Pet: *+${count * 20} EXP* (${user.pet.exp}/${user.pet.maxExp})
+📦 Sisa Makanan Pet di tas: ${user.inventory.makanan_pet} porsi`;
+
+        if (petLvl.leveledUp) {
+          feedText += `\n\n🎉 *PET LEVEL UP!* *${user.pet.name}* naik ke *Level ${petLvl.newLevel}*!\nEfek buff pet semakin menguat!`;
+        }
+
+        return reply(feedText);
+      }
+
+      // 4. MENGGANTI NAMA PET (.renamepet)
+      if (['renamepet'].includes(command)) {
+        if (!user.pet || !user.pet.type) {
+          return reply(`⚠️ Kamu belum memiliki pet companion! Adopsi dulu di *${prefix}pet*.`);
+        }
+
+        if (!args) {
+          return reply(`⚠️ Masukkan nama baru untuk pet kamu!\nContoh: *${prefix}renamepet Kurama*`);
+        }
+
+        const oldName = user.pet.name;
+        user.pet.name = args.trim();
+        saveRpgDb();
+
+        return reply(`✨ Berhasil mengubah nama pet dari *"${oldName}"* menjadi *"${user.pet.name}"*!`);
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 21. STATUS DATABASE & PENYIMPANAN DATA (.dbstatus / .cekdb)
     // ──────────────────────────────────────────────────────────
     if (['dbstatus', 'cekdb'].includes(command)) {
       const status = await getDatabaseStatus(true);
