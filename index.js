@@ -6,7 +6,7 @@ import readline from 'readline';
 import qrcode from 'qrcode-terminal';
 import { config } from './config.js';
 import { messageHandler } from './handler.js';
-import { initMongo, initMidnightSchedule } from './lib/rpg.js';
+import { initMongo } from './lib/rpg.js';
 
 import http from 'http';
 import fs from 'fs';
@@ -65,9 +65,6 @@ const rl = readline.createInterface({
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 let currentSock = null;
-
-// Jadwalkan pembersihan otomatis pesan RPG setiap jam 12 malam (00:00 WIB / 24 Jam)
-initMidnightSchedule(() => currentSock);
 
 // Server Health Check untuk Cloud Hosting (Koyeb / Render / Railway)
 const PORT = process.env.PORT || 8080;

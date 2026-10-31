@@ -146,7 +146,7 @@ export async function messageHandler(sock, msg) {
     }
     const historyList = global.botMessageHistory.get(jid);
 
-    // Helper kirim balasan pesan dengan pencatatan riwayat otomatis (dibersihkan tiap jam 12 malam)
+    // Helper kirim balasan pesan dengan pencatatan riwayat otomatis (untuk fitur .del)
     const reply = async (text, options = {}) => {
       const sent = await sock.sendMessage(jid, { text }, { quoted: msg, ...options });
       if (sent?.key?.id) {

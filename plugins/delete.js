@@ -1,6 +1,6 @@
 // plugins/delete.js - Fitur Hapus Pesan Bot, Pesan Member & Bersihkan Chat Raid RPG
 import { config } from '../config.js';
-import { getBotMsgs, removeBotMsgs, cleanMidnightGroupMessages } from '../lib/rpg.js';
+import { getBotMsgs, removeBotMsgs } from '../lib/rpg.js';
 
 export default {
   name: 'delete',
@@ -112,15 +112,6 @@ export default {
     if (isRpgClear) {
       const rpgTargets = historyList.filter((m) => m.category === 'rpg');
       return await executeBulkDelete(rpgTargets, 'RPG');
-    }
-
-    // ──────────────────────────────────────────────────────────
-    // 2B. JALANKAN MANUAL PEMBERSIHAN TENGAH MALAM (.del midnight)
-    // ──────────────────────────────────────────────────────────
-    if (mode === 'midnight' || mode === 'malam') {
-      await reply('🌙 Menjalankan pembersihan otomatis chat RPG hari ini...');
-      const res = await cleanMidnightGroupMessages(sock);
-      return reply(`✅ Pembersihan selesai! Total *${res.totalDeleted || 0} pesan bot* berhasil dibersihkan.`);
     }
 
     // ──────────────────────────────────────────────────────────
