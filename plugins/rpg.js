@@ -1939,19 +1939,18 @@ ${rewardSummary.join('\n\n')}
         if (!args) {
           return reply(`
 🎰 *KASINO MESIN SLOT KITSUNE* 🎰
-Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
-✨ _Peluang kemenangan telah ditingkatkan agar tidak sering rungkad!_
+Uji keberuntunganmu melawan keganasan mesin slot bandar!
+⚠️ _Peringatan: Bandar slot sangat kejam, resiko rungkad 75%!_
 
 📜 *Tabel Hadiah (3 Rel Kembar):*
-• 👑 👑 👑 ─ Jackpot Raja (*15x Taruhan*)
-• 💎 💎 💎 ─ Jackpot Berlian (*10x Taruhan*)
-• 7️⃣ 7️⃣ 7️⃣ ─ Lucky Seven (*8x Taruhan*)
+• 👑 👑 👑 ─ Jackpot Raja (*25x Taruhan*)
+• 💎 💎 💎 ─ Jackpot Berlian (*15x Taruhan*)
+• 7️⃣ 7️⃣ 7️⃣ ─ Lucky Seven (*10x Taruhan*)
 • 🔔 🔔 🔔 ─ Golden Bell (*6x Taruhan*)
 • 🍋 🍋 🍋 ─ Lemon Segar (*4x Taruhan*)
 • 🍇 🍇 🍇 ─ Anggur Manis (*3.5x Taruhan*)
 • 🍒 🍒 🍒 ─ Cherry Merah (*3x Taruhan*)
-• 2 Simbol Kembar ─ Hadiah Kemenangan (*1.5x Taruhan*)
-• 1 Simbol Hoki (👑/💎/7️⃣) ─ Balik Modal (*1.1x Taruhan*)
+• 2 Simbol Kembar ─ Hiburan Tipis (*1.2x Taruhan*)
 
 💡 *Cara Main:*
 • \`${prefix}slot <taruhan>\` (Contoh: \`${prefix}slot 500\`)
@@ -1980,13 +1979,13 @@ Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
         }
 
         const symbolList = [
-          { sym: '🍒', name: 'Cherry', mult: 3.0, jackpotWeight: 20 },
-          { sym: '🍇', name: 'Anggur', mult: 3.5, jackpotWeight: 18 },
-          { sym: '🍋', name: 'Lemon', mult: 4.0, jackpotWeight: 16 },
-          { sym: '🔔', name: 'Golden Bell', mult: 6.0, jackpotWeight: 14 },
-          { sym: '7️⃣', name: 'Lucky Seven', mult: 8.0, jackpotWeight: 12 },
-          { sym: '💎', name: 'Berlian', mult: 10.0, jackpotWeight: 8 },
-          { sym: '👑', name: 'Mahkota Raja', mult: 15.0, jackpotWeight: 4 },
+          { sym: '🍒', name: 'Cherry', mult: 3.0, jackpotWeight: 22 },
+          { sym: '🍇', name: 'Anggur', mult: 3.5, jackpotWeight: 20 },
+          { sym: '🍋', name: 'Lemon', mult: 4.0, jackpotWeight: 18 },
+          { sym: '🔔', name: 'Golden Bell', mult: 6.0, jackpotWeight: 15 },
+          { sym: '7️⃣', name: 'Lucky Seven', mult: 10.0, jackpotWeight: 12 },
+          { sym: '💎', name: 'Berlian', mult: 15.0, jackpotWeight: 8 },
+          { sym: '👑', name: 'Mahkota Raja', mult: 25.0, jackpotWeight: 5 },
         ];
 
         const roll = Math.random();
@@ -1995,8 +1994,8 @@ Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
         let mult = 0;
         let winType = '';
 
-        if (roll < 0.18) {
-          // 1. TIER 1: JACKPOT 3 KEMBAR (18% Peluang)
+        if (roll < 0.05) {
+          // 1. TIER 1: JACKPOT 3 KEMBAR (Hanya 5% Peluang - Langka & Pecah!)
           const totalJpWeight = symbolList.reduce((acc, s) => acc + s.jackpotWeight, 0);
           let r = Math.random() * totalJpWeight;
           let picked = symbolList[0];
@@ -2013,9 +2012,9 @@ Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
           s3 = picked;
           isWin = true;
           mult = picked.mult;
-          winType = `🎉 *JACKPOT 3 KEMBAR! (${picked.name})*`;
-        } else if (roll < 0.63) {
-          // 2. TIER 2: 2 KEMBAR (45% Peluang - Untung Bersih +50%)
+          winType = `🎉💥 *PECAH JACKPOT 3 KEMBAR! (${picked.name})*`;
+        } else if (roll < 0.25) {
+          // 2. TIER 2: 2 KEMBAR (20% Peluang - Hiburan Balik Modal Dikit)
           const matched = symbolList[Math.floor(Math.random() * symbolList.length)];
           const others = symbolList.filter(s => s.sym !== matched.sym);
           const diff = others[Math.floor(Math.random() * others.length)];
@@ -2030,32 +2029,10 @@ Uji keberuntunganmu memutar 3 rel gulungan mesin slot!
           }
 
           isWin = true;
-          mult = 1.5;
-          winType = `✨ *2 SIMBOL KEMBAR! (${matched.name})*`;
-        } else if (roll < 0.75) {
-          // 3. TIER 3: SIMBOL HOKI (12% Peluang - Balik Modal 1.1x)
-          const luckyList = symbolList.filter(s => ['7️⃣', '💎', '👑'].includes(s.sym));
-          const lucky = luckyList[Math.floor(Math.random() * luckyList.length)];
-          const normalList = symbolList.filter(s => !['7️⃣', '💎', '👑'].includes(s.sym));
-          
-          const n1 = normalList[Math.floor(Math.random() * normalList.length)];
-          const remainingNormals = normalList.filter(s => s.sym !== n1.sym);
-          const n2 = remainingNormals[Math.floor(Math.random() * remainingNormals.length)];
-
-          const arrangement = Math.floor(Math.random() * 3);
-          if (arrangement === 0) {
-            s1 = lucky; s2 = n1; s3 = n2;
-          } else if (arrangement === 1) {
-            s1 = n1; s2 = lucky; s3 = n2;
-          } else {
-            s1 = n1; s2 = n2; s3 = lucky;
-          }
-
-          isWin = true;
-          mult = 1.1;
-          winType = `🌟 *SIMBOL HOKI (${lucky.name})!* (Balik Modal + 10%)`;
+          mult = 1.2;
+          winType = `✨ *2 SIMBOL KEMBAR! (${matched.name})* _(Hiburan)_`;
         } else {
-          // 4. TIER 4: ZONK / RUNGKAD (Hanya 25% Peluang)
+          // 3. TIER 3: RUNGKAD / ZONK TOTAL (75% Peluang - Kebanyakan Rungkad!)
           const shuffled = [...symbolList].sort(() => 0.5 - Math.random());
           s1 = shuffled[0];
           s2 = shuffled[1];
@@ -2076,8 +2053,16 @@ Saldo Kamu Sekarang: *${formatNumber(user.money)} Gold*
 `.trim();
         } else {
           user.money -= bet;
+          const rungkadQuotes = [
+            "💀 *RUNGKAD KAU JIR!* Modal disikat habis oleh mesin slot!",
+            "💀 *ZONK TOTAL!* Bandar tertawa melihat koinmu melayang!",
+            "💀 *RUNGKAD LAGI!* Jangan main slot kalau gak mau miskin!",
+            "💀 *LENYAP SUDAH!* Putaran ampas tanpa hasil!",
+            "💀 *RUNGKAD ABANGKUH!* Modal menipis, bandar makin kaya!"
+          ];
+          const quote = rungkadQuotes[Math.floor(Math.random() * rungkadQuotes.length)];
           resultText = `
-💀 *ZONK! Kamu belum beruntung.*
+${quote}
 💸 Kehilangan taruhan: *-${formatNumber(bet)} Gold*
 Sisa Saldo Kamu: *${formatNumber(user.money)} Gold*
 `.trim();
