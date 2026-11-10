@@ -1,5 +1,5 @@
 // plugins/sticker.js - Plugin Pembuat Stiker & Watermark
-import { createSticker } from '../lib/sticker.js';
+import { createSticker, setStickerWatermark } from '../lib/sticker.js';
 import { config } from '../config.js';
 import { downloadContentFromMessage } from '@whiskeysockets/baileys';
 
@@ -16,7 +16,7 @@ export default {
   name: 'sticker',
   command: ['s', 'sticker', 'stiker', 'wm', 'take'],
   category: 'sticker',
-  description: 'Konversi foto/video ke stiker WebP dan ganti watermark',
+  description: 'Konversi foto/GIF/video ke stiker WebP 1:1 dan ganti watermark',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
     // 1. Buat Stiker Baru (.s / .sticker)
     if (['s', 'sticker', 'stiker'].includes(command)) {
@@ -47,24 +47,36 @@ export default {
         mediaMsg = quoted.documentMessage;
         mediaType = 'document';
         isVideo = mediaMsg.mimetype?.includes('video') || mediaMsg.mimetype?.includes('gif');
+      } else if (quoted?.stickerMessage) {
+        mediaMsg = quoted.stickerMessage;
+        mediaType = 'sticker';
+        isVideo = Boolean(quoted.stickerMessage.isAnimated);
       }
 
       if (!mediaMsg) {
-        return reply(`⚠️ Kirim gambar/video/GIF dengan caption *${prefix}${command}* atau balas (quote) media dengan *${prefix}${command}*`);
+        return reply(`⚠️ Kirim gambar/video/GIF dengan caption *${prefix}${command}* atau balas (quote) media dengan *${prefix}${command}*\n💡 Tambahkan *${prefix}${command} full* jika tidak ingin dipotong ke rasio 1:1.`);
       }
 
       if (isVideo && mediaMsg.seconds > 10) {
         return reply('⚠️ Durasi video/GIF maksimal 10 detik untuk dijadikan stiker!');
       }
 
-      await reply('⏳ Sedang memproses dan mengompres stiker animasi...');
+      const modeArg = (args || '').trim().toLowerCase();
+      let fitMode = 'crop';
+      if (['full', 'ori', 'nocrop', 'fit'].includes(modeArg)) {
+        fitMode = 'full';
+      } else if (['crop', 'kotak', '1:1'].includes(modeArg)) {
+        fitMode = 'force_crop';
+      }
+
+      await reply(isVideo ? '⏳ Sedang memproses stiker animasi (1:1)...' : '⏳ Sedang membuat stiker (1:1)...');
 
       try {
         const buffer = await downloadMedia(mediaMsg, mediaType);
         const packname = config.sticker.packname;
         const author = config.sticker.author;
 
-        const stickerBuffer = await createSticker(buffer, packname, author);
+        const stickerBuffer = await createSticker(buffer, packname, author, { fitMode });
         await sock.sendMessage(jid, { sticker: stickerBuffer }, { quoted: msg });
       } catch (err) {
         console.error('Gagal convert stiker:', err);
@@ -88,7 +100,7 @@ export default {
 
       try {
         const buffer = await downloadMedia(quoted.stickerMessage, 'sticker');
-        const newSticker = await createSticker(buffer, packname, author);
+        const newSticker = await setStickerWatermark(buffer, packname, author);
         await sock.sendMessage(jid, { sticker: newSticker }, { quoted: msg });
       } catch (err) {
         console.error('Gagal mengubah watermark:', err);

@@ -45,7 +45,7 @@ export default {
       {
         category: "🎨 STIKER & MEDIA",
         items: [
-          { cmd: "s", param: "", desc: "Ubah gambar/video jadi stiker" },
+          { cmd: "s", param: "[full]", desc: "Ubah foto/GIF/video jadi stiker 1:1" },
           { cmd: "wm", param: "<pack|author>", desc: "Ganti nama pack stiker" },
           { cmd: "toimg", param: "", desc: "Ubah stiker jadi foto biasa" },
           { cmd: "tts", param: "<teks>", desc: "Voice note suara Google" },
