@@ -1113,17 +1113,17 @@ Berhasil membuat *${recipe.name}*!
 ┃ 🌌 *Pity Eternal (6★):* [${pityEternalBar}] ${user.gachaPityEternal || 0}/500
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🌌 *Perlengkapan 6★ Eternal:*
-• ⚔️ *Pedang Ea* (+850 ATK) ─ Senjata kuno terkuat
-• 🔱 *Tombak Longinus* (+780 ATK) ─ Tombak suci terkuat
-• 🛡️ *Zirah Ouroboros* (+620 DEF) ─ Zirah pelindung terkuat
-• ⛏️ *Beliung Celestial* (Tier 7) ─ Beliung tambang tertinggi
+🌌 *Perlengkapan 6★ Eternal (Legendaris):*
+• ⚔️ *Pedang Naga Hitam* (+850 ATK) ─ Pedang terkuat sisik naga hitam
+• 🔱 *Tombak Raja Petir* (+780 ATK) ─ Tombak suci berenergi halilintar
+• 🛡️ *Zirah Raja Naga* (+620 DEF) ─ Zirah pelindung taring raja naga
+• ⛏️ *Beliung Naga Emas* (Tier 7) ─ Beliung tambang tertinggi
 
-👑 *Senjata 5★ Mythic:*
-• ⚔️ *Pedang Excalibur* (+400 ATK) ─ Pedang suci cahaya
-• 🗡️ *Pedang Muramasa* (+360 ATK) ─ Pedang terkutuk haus darah
-• 🛡️ *Zirah Aegis* (+290 DEF) ─ Perisai dewa pelindung mutlak
-• ⛏️ *Beliung Mithril* (Tier 6) ─ Beliung tambang kristal suci
+👑 *Perlengkapan 5★ Mythic (Langka):*
+• ⚔️ *Pedang Cahaya Suci* (+400 ATK) ─ Pedang kesatria pemancar cahaya
+• 🗡️ *Pedang Bayangan Merah* (+360 ATK) ─ Pedang cepat tebasan mematikan
+• 🛡️ *Zirah Baja Hitam* (+290 DEF) ─ Zirah kokoh tempaan gunung api
+• ⛏️ *Beliung Kristal Biru* (Tier 6) ─ Beliung penambang kristal murni
 
 💎 *Sistem Garansi Pity:*
 • 👑 *Pity 5★ Mythic (120x):* Jika mencapai 120x tarikan, kamu **PASTI DIJAMIN 100%** mendapatkan perlengkapan 5★ Mythic! (Reset saat dapat 5★).
@@ -1527,9 +1527,9 @@ ${topHitter ? topHitter.split('\n').map(l => '┃ ' + l).join('\n') : '┃  _Bel
         { prefix: "🔥 [Beringas]", hpMult: 1.15, atkMult: 1.2, rewardMult: 1.2 },
         { prefix: "⚡ [Murka]", hpMult: 1.1, atkMult: 1.3, rewardMult: 1.25 },
         { prefix: "💀 [Terkutuk]", hpMult: 1.25, atkMult: 1.15, rewardMult: 1.2 },
-        { prefix: "👑 [Kuno]", hpMult: 1.3, atkMult: 1.2, rewardMult: 1.3 },
-        { prefix: "🌌 [Abyssal]", hpMult: 1.4, atkMult: 1.35, rewardMult: 1.4 },
-        { prefix: "🛡️ [Berdarah Besi]", hpMult: 1.35, atkMult: 1.05, rewardMult: 1.15 },
+        { prefix: "👑 [Ganas]", hpMult: 1.3, atkMult: 1.2, rewardMult: 1.3 },
+        { prefix: "🌑 [Kegelapan]", hpMult: 1.4, atkMult: 1.35, rewardMult: 1.4 },
+        { prefix: "🛡️ [Berbaju Besi]", hpMult: 1.35, atkMult: 1.05, rewardMult: 1.15 },
         { prefix: "", hpMult: 1.0, atkMult: 1.0, rewardMult: 1.0 }
       ];
       const selectedTrait = traits[Math.floor(Math.random() * traits.length)];
@@ -2264,13 +2264,21 @@ Contoh: \`${prefix}adopt kitsune Shiro\` atau \`${prefix}adopt fenrir Kuro\`
         }
 
         const parts = args.trim().split(/\s+/);
-        const petType = parts[0]?.toLowerCase();
+        const rawPetType = parts[0]?.toLowerCase();
+        const petAliasMap = {
+          rubah: 'kitsune',
+          kura: 'genbu',
+          kurakura: 'genbu',
+          serigala: 'fenrir',
+          naga: 'fafnir',
+        };
+        const petType = petAliasMap[rawPetType] || rawPetType;
         const petName = parts.slice(1).join(' ').trim();
 
         const petConfig = PET_TYPES[petType];
         if (!petConfig) {
           const avail = Object.keys(PET_TYPES).join(', ');
-          return reply(`❌ Ras pet *"${petType}"* tidak dikenali!\nPilihan yang tersedia: *${avail}*.\nKetik *${prefix}pet* untuk info detail.`);
+          return reply(`❌ Ras pet *"${rawPetType}"* tidak dikenali!\nPilihan yang tersedia: *${avail}* (atau rubah, kura, serigala, naga).\nKetik *${prefix}pet* untuk info detail.`);
         }
 
         if (!petName) {
