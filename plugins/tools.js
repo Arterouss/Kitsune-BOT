@@ -29,11 +29,16 @@ export default {
       const freeRam = (os.freemem() / 1024 / 1024 / 1024).toFixed(2);
       const latency = Date.now() - start;
 
+      const op = config.operatingHours;
+      const opLine = op?.enabled
+        ? `\n⏰ *Jam Operasional:* ${String(op.startHour ?? 5).padStart(2, '0')}:00 - ${String(op.endHour ?? 23).padStart(2, '0')}:00 WIB`
+        : '';
+
       const pingText = `
 🏓 *Pong!*
 ⚡ *Kecepatan Respon:* ${latency} ms
 💻 *Sistem:* ${os.type()} (${os.arch()})
-🧠 *Penggunaan RAM:* ${ramUsed} MB / ${ramTotal} GB (Sisa: ${freeRam} GB)
+🧠 *Penggunaan RAM:* ${ramUsed} MB / ${ramTotal} GB (Sisa: ${freeRam} GB)${opLine}
 `.trim();
       return reply(pingText);
     }

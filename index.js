@@ -5,7 +5,7 @@ import pino from 'pino';
 import readline from 'readline';
 import qrcode from 'qrcode-terminal';
 import { config } from './config.js';
-import { messageHandler } from './handler.js';
+import { messageHandler, isBotActiveNow } from './handler.js';
 import { initMongo } from './lib/rpg.js';
 
 import http from 'http';
@@ -66,20 +66,37 @@ const question = (query) => new Promise((resolve) => rl.question(query, resolve)
 
 let currentSock = null;
 
-// Server Health Check untuk Cloud Hosting (Koyeb / Render / Railway)
+// Server Health Check untuk Cloud Hosting (Koyeb / Render / Railway) & Uptime Monitor
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
+  const schedule = isBotActiveNow();
+  const startStr = String(schedule.startHour ?? 5).padStart(2, '0') + ':00';
+  const endStr = String(schedule.endHour ?? 23).padStart(2, '0') + ':00';
+
+  const statusBadge = schedule.active
+    ? `<div style="display: inline-block; padding: 10px 24px; background: #22c55e; color: #022c22; font-weight: bold; border-radius: 999px; margin-top: 20px;">
+         🟢 BOT IS ACTIVE & HEALTHY (${startStr} - ${endStr} WIB)
+       </div>`
+    : `<div style="display: inline-block; padding: 10px 24px; background: #38bdf8; color: #082f49; font-weight: bold; border-radius: 999px; margin-top: 20px;">
+         🌙 BOT IS IN SLEEP MODE (Offline ${endStr} - ${startStr} WIB)
+       </div>`;
+
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`
     <!DOCTYPE html>
     <html>
-      <head><title>Kitsune Bot</title></head>
-      <body style="font-family: -apple-system, sans-serif; text-align: center; padding: 60px; background: #0f172a; color: #f8fafc;">
-        <h1 style="font-size: 3rem; margin-bottom: 10px;">🦊 Kitsune Bot</h1>
-        <p style="font-size: 1.2rem; color: #94a3b8;">WhatsApp Multi-Device Bot created by <strong>Arterouss</strong></p>
-        <div style="display: inline-block; padding: 10px 20px; background: #22c55e; color: #000; font-weight: bold; border-radius: 999px; margin-top: 20px;">
-          🟢 BOT IS ACTIVE & HEALTHY
-        </div>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Kitsune Bot Status</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #f8fafc;">
+        <h1 style="font-size: 2.8rem; margin-bottom: 10px;">🦊 ${config.botName}</h1>
+        <p style="font-size: 1.1rem; color: #94a3b8; margin-top: 0;">Private Multi-Device WhatsApp Bot by <strong>${config.ownerName}</strong></p>
+        ${statusBadge}
+        <p style="margin-top: 24px; font-size: 0.95rem; color: #64748b;">
+          HTTP 200 OK • Timezone: ${schedule.timezone || 'Asia/Jakarta'} • Uptime Monitor Keep-Alive
+        </p>
       </body>
     </html>
   `);

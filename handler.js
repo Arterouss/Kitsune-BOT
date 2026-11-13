@@ -8,8 +8,48 @@ import { recordBotMsg } from './lib/rpg.js';
 // Koleksi Plugin dan Cooldown
 export const plugins = [];
 const cooldownMap = new Map();
+const sleepNoticeMap = new Map();
 const startTime = Date.now();
 const pluginDir = path.resolve('./plugins');
+
+/**
+ * Mengecek apakah bot saat ini berada di dalam jam operasional aktif (Auto-Sleep)
+ */
+export function isBotActiveNow() {
+  const op = config.operatingHours;
+  if (!op || !op.enabled) {
+    return { active: true, enabled: false };
+  }
+
+  const tz = op.timezone || 'Asia/Jakarta';
+  let currentHour = 12;
+  try {
+    const str = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      hourCycle: 'h23'
+    }).format(new Date());
+    currentHour = parseInt(str, 10);
+  } catch {
+    currentHour = new Date().getHours();
+  }
+
+  const start = op.startHour ?? 5;
+  const end = op.endHour ?? 23;
+
+  const isActive = (start < end)
+    ? (currentHour >= start && currentHour < end)
+    : (currentHour >= start || currentHour < end);
+
+  return {
+    active: isActive,
+    enabled: true,
+    currentHour,
+    startHour: start,
+    endHour: end,
+    timezone: tz
+  };
+}
 
 /**
  * Memuat semua file plugin secara dinamis dari folder ./plugins
@@ -131,7 +171,34 @@ export async function messageHandler(sock, msg) {
     const matchedPlugin = plugins.find((p) => p.command.includes(command));
     if (!matchedPlugin) return; // Jika bukan command terdaftar, abaikan
 
-    // 2. KEAMANAN ANTI-BANNED: Simulasi Mengetik Alami
+    // 2. JAM OPERASIONAL / AUTO-SLEEP (Mencegah bot aktif tengah malam)
+    const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '');
+    const isOwner = cleanOwner && sender.includes(cleanOwner);
+    const schedule = isBotActiveNow();
+
+    if (!schedule.active && !isOwner) {
+      if (config.operatingHours?.silentDuringOffHours) {
+        return; // Hening total tanpa balasan
+      }
+
+      const lastNotice = sleepNoticeMap.get(sender) || 0;
+      const cooldown = config.operatingHours?.sleepNoticeCooldownMs || 60000;
+      if (now - lastNotice >= cooldown) {
+        sleepNoticeMap.set(sender, now);
+        const startStr = String(schedule.startHour).padStart(2, '0') + ':00';
+        const endStr = String(schedule.endHour).padStart(2, '0') + ':00';
+        await sock.sendMessage(jid, {
+          text: `🌙 *[JAM OPERASIONAL BOT]*\n\n` +
+                `Halo kak *${senderName}*, saat ini *${config.botName}* sedang beristirahat (*OFF*).\n\n` +
+                `⏰ *Jam Operasional:* ${startStr} - ${endStr} WIB\n` +
+                `💤 Bot akan otomatis aktif kembali pukul *${startStr} WIB*.\n\n` +
+                `_Terima kasih atas pengertiannya!_ 🙏`
+        }, { quoted: msg });
+      }
+      return;
+    }
+
+    // 3. KEAMANAN ANTI-BANNED: Simulasi Mengetik Alami
     if (config.security.simulateTyping) {
       await sock.sendPresenceUpdate('composing', jid);
       await sleep(config.security.typingDelayMs);

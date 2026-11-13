@@ -11,6 +11,17 @@ export const config = {
   // Prefix perintah (bisa titik, tanda seru, tagar, atau garis miring)
   prefixes: ['.', '!', '#', '/'],
 
+  // Pengaturan Jam Operasional (Auto-Sleep)
+  // Bot aktif jam 05:00 s/d 23:00 WIB, dan istirahat jam 23:00 s/d 05:00 WIB
+  operatingHours: {
+    enabled: true,               // true = aktifkan jadwal jam kerja & tidur bot
+    startHour: 5,                // Bangun & aktif jam 05:00 WIB
+    endHour: 23,                 // Istirahat / tidur jam 23:00 WIB (11 malam)
+    timezone: 'Asia/Jakarta',    // Zona waktu (WIB)
+    silentDuringOffHours: false, // false = kirim info jam operasional sopan; true = hening total
+    sleepNoticeCooldownMs: 60000 // Cooldown pemberitahuan tidur per pengirim (1 menit agar tidak spam)
+  },
+
   // Pengaturan Watermark Stiker (Exif Metadata)
   sticker: {
     packname: 'Kitsune Sticker Pack',

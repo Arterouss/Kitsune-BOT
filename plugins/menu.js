@@ -185,10 +185,15 @@ export default {
       }
     }
 
+    const op = config.operatingHours;
+    const opText = op?.enabled
+      ? `\n┃ ⏰ *Operasional:* ${String(op.startHour ?? 5).padStart(2, "0")}:00 - ${String(op.endHour ?? 23).padStart(2, "0")}:00 WIB`
+      : "";
+
     const header = `
 ╭━━━━━「 *${config.botName.toUpperCase()}* 」━━━━━╮
 ┃ 👤 *Halo, ${senderName}!*
-┃ ⏱️ *Uptime:* ${uptime} | 🧩 *Modul:* ${plugins.length}
+┃ ⏱️ *Uptime:* ${uptime} | 🧩 *Modul:* ${plugins.length}${opText}
 ┃ ⚡ *Prefix:* [ ${config.prefixes.join(" ")} ]
 ╰━━━━━━━━━━━━━━━━━━━━━━━╯
 `.trim();
