@@ -112,6 +112,16 @@ export async function messageHandler(sock, msg) {
     const sender = isGroup ? (msg.key.participant || msg.participant) : jid;
     const senderName = msg.pushName || 'Sahabat';
 
+    // Otomatis pecahkan nomor asli jika WhatsApp mengirim ID Privasi LID (@lid)
+    if (sender && sender.endsWith('@lid') && sock?.signalRepository?.lidMapping?.getPNForLID) {
+      try {
+        const pn = await sock.signalRepository.lidMapping.getPNForLID(sender);
+        if (pn) {
+          msg.senderPn = pn;
+        }
+      } catch {}
+    }
+
     // Ekstrak teks pesan
     const msgType = Object.keys(msg.message)[0];
     let body = '';

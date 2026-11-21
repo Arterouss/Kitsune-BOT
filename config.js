@@ -125,17 +125,34 @@ export function isUserOwner(sender, msg = null) {
   if (!sender) return false;
 
   const owners = getOwnerNumbers();
-  const rawSender = String(sender).toLowerCase();
-  const senderNoDomain = rawSender.split('@')[0].split(':')[0].trim();
-  const cleanSenderNum = senderNoDomain.replace(/[^0-9]/g, '').replace(/^0/, '62');
+  const candidates = new Set();
+
+  const addCand = (val) => {
+    if (!val) return;
+    const raw = String(val).toLowerCase();
+    candidates.add(raw);
+    const noDomain = raw.split('@')[0].split(':')[0].trim();
+    candidates.add(noDomain);
+    const cleanNum = noDomain.replace(/[^0-9]/g, '').replace(/^0/, '62');
+    if (cleanNum) candidates.add(cleanNum);
+  };
+
+  addCand(sender);
+  if (msg?.senderPn) addCand(msg.senderPn);
+  if (msg?.key?.remoteJid) addCand(msg.key.remoteJid);
+  if (msg?.key?.participant) addCand(msg.key.participant);
+  if (msg?.key?.participantPn) addCand(msg.key.participantPn);
+  if (msg?.key?.remoteJidPn) addCand(msg.key.remoteJidPn);
 
   for (const owner of owners) {
     if (!owner) continue;
-    const ownerLower = String(owner).toLowerCase();
-    if (rawSender === ownerLower || senderNoDomain === ownerLower) return true;
-    if (cleanSenderNum && cleanSenderNum === ownerLower) return true;
-    if (cleanSenderNum && ownerLower.length >= 10 && cleanSenderNum.includes(ownerLower)) return true;
-    if (rawSender.includes(ownerLower)) return true;
+    const cleanOwner = String(owner).toLowerCase().split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    const rawOwner = String(owner).toLowerCase();
+
+    for (const cand of candidates) {
+      if (cand === rawOwner || cand === cleanOwner) return true;
+      if (cand.includes(rawOwner) || cand.includes(cleanOwner)) return true;
+    }
   }
   return false;
 }
