@@ -45,10 +45,11 @@ export default {
 
     // 3. Owner Info
     if (command === 'owner') {
+      const cleanOwner = config.ownerNumber.replace(/[^0-9]/g, '').replace(/^0/, '62');
       const ownerText = `
 👑 *Kontak Pemilik & Developer:*
 Nama: *${config.ownerName}*
-WhatsApp: https://wa.me/${config.ownerNumber.replace(/[^0-9]/g, '')}
+WhatsApp: https://wa.me/${cleanOwner}
 GitHub: ${config.github}
 `.trim();
       return reply(ownerText);

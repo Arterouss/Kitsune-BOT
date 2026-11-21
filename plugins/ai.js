@@ -22,8 +22,8 @@ export default {
     // 1. MANAJEMEN PENGATURAN API OPENAI (KHUSUS OWNER)
     // ============================================================
     if (['setai', 'setapi', 'aicfg', 'getai'].includes(command)) {
-      const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '');
-      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '');
+      const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
+      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
       const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
 
       if (!isOwner) {

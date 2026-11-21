@@ -172,8 +172,8 @@ export async function messageHandler(sock, msg) {
     if (!matchedPlugin) return; // Jika bukan command terdaftar, abaikan
 
     // 2. JAM OPERASIONAL / AUTO-SLEEP (Mencegah bot aktif tengah malam)
-    const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '');
-    const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '');
+    const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
+    const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
     const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
     const schedule = isBotActiveNow();
 
