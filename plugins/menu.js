@@ -23,7 +23,8 @@ export default {
       {
         category: "🤖 AI & OCR",
         items: [
-          { cmd: "ai", param: "<teks>", desc: "Tanya AI Gemini/GPT" },
+          { cmd: "ai", param: "<teks>", desc: "Tanya AI OpenAI/Gemini/GPT" },
+          { cmd: "setai", param: "[opsi]", desc: "Atur API Key, URL & Model AI (Owner)" },
           { cmd: "wiki", param: "<topik>", desc: "Ensiklopedia Wikipedia" },
           { cmd: "ocr", param: "", desc: "Ekstrak teks dari foto" },
         ],

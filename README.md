@@ -43,7 +43,8 @@ Bot dirancang agar dapat di-host di layanan Cloud (seperti **Render**, **Koyeb**
 Kitsune Bot menggunakan sistem plugin modular independen yang dimuat secara dinamis dari direktori `plugins/`:
 
 ### 1. 🤖 Kecerdasan Buatan (AI) & OCR
-- `.ai <pertanyaan>` ─ Asisten pintar berbasis Groq (Llama 3) atau Google Gemini.
+- `.ai <pertanyaan>` ─ Asisten pintar berbasis OpenAI Compatible API (GPT-4o-mini, Groq Llama 3, DeepSeek, OpenRouter) dengan fallback otomatis.
+- `.setai [opsi]` / `.aicfg` ─ Manajemen konfigurasi API Key, Base URL, nama model, dan system prompt langsung via chat WhatsApp tanpa perlu edit kode (Khusus Owner).
 - `.wiki <topik>` ─ Pencarian ensiklopedia resmi Wikipedia Indonesia.
 - `.ocr` ─ Ekstraksi teks dari foto/gambar dokumen secara otomatis via Gemini Vision.
 

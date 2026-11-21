@@ -7,13 +7,16 @@ import qrcode from 'qrcode-terminal';
 import { config } from './config.js';
 import { messageHandler, isBotActiveNow } from './handler.js';
 import { initMongo } from './lib/rpg.js';
+import { syncAiConfigFromMongo } from './lib/ai.js';
 
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
 
 // Inisialisasi Database Cloud MongoDB Atlas jika tersedia di Environment
-initMongo().catch(() => {});
+initMongo().then(() => {
+  syncAiConfigFromMongo().catch(() => {});
+}).catch(() => {});
 
 // Flag untuk menandai jika sesi lama di-logout sehingga tidak memulihkan sesi mati
 let sessionInvalidated = false;
