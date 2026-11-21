@@ -23,7 +23,8 @@ export default {
     // ============================================================
     if (['setai', 'setapi', 'aicfg', 'getai'].includes(command)) {
       const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '');
-      const isOwner = cleanOwner && sender.includes(cleanOwner);
+      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '');
+      const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
 
       if (!isOwner) {
         return reply('⛔ *AKSES DITOLAK:*\nPerintah pengaturan API AI hanya dapat diakses oleh Pemilik Bot (Owner) demi menjaga keamanan API Key.');

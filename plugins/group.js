@@ -19,7 +19,9 @@ export default {
       // Helper cek apakah pengirim adalah admin grup atau owner bot
       const senderParticipant = participants.find(p => p.id === sender);
       const isSenderAdmin = senderParticipant?.admin === 'admin' || senderParticipant?.admin === 'superadmin';
-      const isOwner = sender.includes(config.ownerNumber.replace(/[^0-9]/g, ''));
+      const cleanOwner = config.ownerNumber.replace(/[^0-9]/g, '');
+      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '');
+      const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
 
       // Helper cek apakah nomor bot adalah admin grup
       const botNumber = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : '';
