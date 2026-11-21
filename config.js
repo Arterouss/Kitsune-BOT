@@ -24,7 +24,7 @@ export const config = {
   // Informasi Bot & Creator
   botName: 'Kitsune Bot',
   ownerName: 'Arterouss',
-  ownerNumber: process.env.OWNER_NUMBER || '6281234567890', // Nomor WhatsApp Owner (Gunakan env OWNER_NUMBER di cloud)
+  ownerNumber: process.env.OWNER_NUMBER || '6288976563675', // Nomor WhatsApp Owner & Bot
   github: 'https://github.com/Arterouss/Kitsune-BOT',
   bannerPath: './assets/banner.jpg', // Banner gambar pembuka di .menu
   
