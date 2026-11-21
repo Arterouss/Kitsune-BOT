@@ -1,5 +1,5 @@
 // plugins/group.js - Plugin Khusus Pengelolaan Grup WhatsApp
-import { config } from '../config.js';
+import { config, isUserOwner } from '../config.js';
 
 export default {
   name: 'group',
@@ -19,9 +19,7 @@ export default {
       // Helper cek apakah pengirim adalah admin grup atau owner bot
       const senderParticipant = participants.find(p => p.id === sender);
       const isSenderAdmin = senderParticipant?.admin === 'admin' || senderParticipant?.admin === 'superadmin';
-      const cleanOwner = config.ownerNumber.replace(/[^0-9]/g, '').replace(/^0/, '62');
-      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
-      const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
+      const isOwner = isUserOwner(sender, msg);
 
       // Helper cek apakah nomor bot adalah admin grup
       const botNumber = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : '';

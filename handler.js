@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { config } from './config.js';
+import { config, isUserOwner } from './config.js';
 import { recordBotMsg } from './lib/rpg.js';
 
 // Koleksi Plugin dan Cooldown
@@ -172,9 +172,7 @@ export async function messageHandler(sock, msg) {
     if (!matchedPlugin) return; // Jika bukan command terdaftar, abaikan
 
     // 2. JAM OPERASIONAL / AUTO-SLEEP (Mencegah bot aktif tengah malam)
-    const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
-    const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
-    const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
+    const isOwner = isUserOwner(sender, msg);
     const schedule = isBotActiveNow();
 
     if (!schedule.active && !isOwner) {

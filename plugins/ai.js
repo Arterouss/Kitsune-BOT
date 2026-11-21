@@ -9,7 +9,7 @@ import {
   normalizeBaseUrl,
   maskApiKey
 } from '../lib/ai.js';
-import { config } from '../config.js';
+import { config, isUserOwner, getOwnerNumbers } from '../config.js';
 
 export default {
   name: 'ai',
@@ -22,11 +22,10 @@ export default {
     // 1. MANAJEMEN PENGATURAN API OPENAI (KHUSUS OWNER)
     // ============================================================
     if (['setai', 'setapi', 'aicfg', 'getai'].includes(command)) {
-      const cleanOwner = (config.ownerNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
-      const cleanBot = (config.phoneNumber || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
-      const isOwner = Boolean(msg.key?.fromMe || (cleanOwner && sender.includes(cleanOwner)) || (cleanBot && sender.includes(cleanBot)));
+      const isOwner = isUserOwner(sender, msg);
 
       if (!isOwner) {
+        console.warn(`[AUTH DENIED] Sender "${sender}" ditolak mengakses ${prefix}${command}. Terdaftar:`, getOwnerNumbers());
         return reply('⛔ *AKSES DITOLAK:*\nPerintah pengaturan API AI hanya dapat diakses oleh Pemilik Bot (Owner) demi menjaga keamanan API Key.');
       }
 
