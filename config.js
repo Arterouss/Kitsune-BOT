@@ -80,19 +80,23 @@ export const config = {
 export function getOwnerNumbers() {
   const owners = new Set();
 
+  const addNumber = (raw) => {
+    if (!raw) return;
+    const parts = String(raw).split(/[,;| ]+/);
+    for (const p of parts) {
+      if (!p) continue;
+      const noDomain = p.split('@')[0].split(':')[0].trim();
+      const clean = noDomain.replace(/[^0-9]/g, '').replace(/^0/, '62');
+      if (clean) owners.add(clean);
+      if (noDomain && noDomain !== clean) owners.add(noDomain.toLowerCase());
+    }
+  };
+
   // 1. Dari config.ownerNumber
-  if (config.ownerNumber) {
-    owners.add(config.ownerNumber.replace(/[^0-9]/g, '').replace(/^0/, '62'));
-  }
+  addNumber(config.ownerNumber);
 
   // 2. Dari process.env.OWNER_NUMBER
-  if (process.env.OWNER_NUMBER) {
-    const envOwners = process.env.OWNER_NUMBER.split(/[,;| ]+/);
-    for (const num of envOwners) {
-      const clean = num.replace(/[^0-9]/g, '').replace(/^0/, '62');
-      if (clean) owners.add(clean);
-    }
-  }
+  addNumber(process.env.OWNER_NUMBER);
 
   // 3. Dari database/owner.json (Aman & Tidak pernah di-push ke git)
   try {
@@ -101,17 +105,14 @@ export function getOwnerNumbers() {
       const raw = fs.readFileSync(ownerFile, 'utf-8');
       const data = JSON.parse(raw);
       const list = Array.isArray(data) ? data : (data.owners || []);
-      for (const num of list) {
-        const clean = String(num).replace(/[^0-9]/g, '').replace(/^0/, '62');
-        if (clean) owners.add(clean);
+      for (const item of list) {
+        addNumber(item);
       }
     }
   } catch {}
 
   // 4. Nomor bot sendiri
-  if (config.phoneNumber) {
-    owners.add(config.phoneNumber.replace(/[^0-9]/g, '').replace(/^0/, '62'));
-  }
+  addNumber(config.phoneNumber);
 
   return Array.from(owners);
 }
@@ -124,14 +125,17 @@ export function isUserOwner(sender, msg = null) {
   if (!sender) return false;
 
   const owners = getOwnerNumbers();
-  const rawSender = String(sender);
-  const cleanSenderNum = rawSender.split('@')[0].split(':')[0].replace(/[^0-9]/g, '').replace(/^0/, '62');
+  const rawSender = String(sender).toLowerCase();
+  const senderNoDomain = rawSender.split('@')[0].split(':')[0].trim();
+  const cleanSenderNum = senderNoDomain.replace(/[^0-9]/g, '').replace(/^0/, '62');
 
   for (const owner of owners) {
     if (!owner) continue;
-    if (rawSender.includes(owner) || cleanSenderNum === owner) {
-      return true;
-    }
+    const ownerLower = String(owner).toLowerCase();
+    if (rawSender === ownerLower || senderNoDomain === ownerLower) return true;
+    if (cleanSenderNum && cleanSenderNum === ownerLower) return true;
+    if (cleanSenderNum && ownerLower.length >= 10 && cleanSenderNum.includes(ownerLower)) return true;
+    if (rawSender.includes(ownerLower)) return true;
   }
   return false;
 }
