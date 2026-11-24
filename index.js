@@ -241,9 +241,9 @@ async function startBot() {
   // 5. Simpan Kredensial Sesi Otomatis
   sock.ev.on('creds.update', saveCreds);
 
-  // 6. Tangani Pesan Masuk (Upsert)
+  // 6. Tangani Pesan Masuk (Upsert) - Mendukung pesan masuk (notify) dan chat mandiri (append / self-chat)
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
+    if (type !== 'notify' && type !== 'append') return;
 
     for (const msg of messages) {
       await messageHandler(sock, msg);

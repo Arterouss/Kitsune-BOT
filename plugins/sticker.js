@@ -14,7 +14,7 @@ async function downloadMedia(mediaMessage, mediaType) {
 
 export default {
   name: 'sticker',
-  command: ['s', 'sticker', 'stiker', 'wm', 'take', 'cekstiker', 'inspect', 'cek'],
+  command: ['s', 'sticker', 'stiker', 'wm', 'take', 'cekstiker', 'ceksticker', 'inspect', 'cek'],
   category: 'sticker',
   description: 'Konversi foto/GIF/video ke stiker WebP 1:1, ganti watermark & inspeksi stiker',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
@@ -110,12 +110,17 @@ export default {
     }
 
     // 3. Inspeksi Detail Stiker (.cekstiker / .inspect)
-    if (['cekstiker', 'inspect', 'cek'].includes(command)) {
-      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    if (['cekstiker', 'ceksticker', 'inspect', 'cek'].includes(command)) {
+      let quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (quoted?.ephemeralMessage?.message) quoted = quoted.ephemeralMessage.message;
+      if (quoted?.viewOnceMessage?.message) quoted = quoted.viewOnceMessage.message;
+      if (quoted?.viewOnceMessageV2?.message) quoted = quoted.viewOnceMessageV2.message;
+
       const targetSticker = quoted?.stickerMessage || msg.message?.stickerMessage;
 
       if (!targetSticker) {
-        return reply(`⚠️ Balas (quote) stiker yang ingin diperiksa dengan mengetik:\n*${prefix}${command}*`);
+        const quotedType = quoted ? Object.keys(quoted)[0] : 'tidak ada';
+        return reply(`⚠️ Balas (quote) stiker yang ingin diperiksa dengan mengetik:\n*${prefix}${command}*\n\n_(Pesan yang terdeteksi: ${quotedType})_`);
       }
 
       await reply('🔍 Sedang membongkar & menganalisis struktur file stiker...');

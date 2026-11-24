@@ -151,11 +151,16 @@ export async function messageHandler(sock, msg) {
       return;
     }
 
-    // Cek apakah pesan diawali prefix perintah yang valid
-    const prefix = config.prefixes.find((p) => body.startsWith(p));
-    
-    // --- CEK JAWABAN GAME ---
-    if (!prefix) {
+    // Cek apakah pesan diawali prefix perintah yang valid (atau perintah langsung di private / self-chat)
+    let prefix = config.prefixes.find((p) => body.startsWith(p));
+    let command = '';
+    let args = '';
+
+    if (prefix) {
+      command = body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
+      args = body.slice(prefix.length + command.length).trim();
+    } else {
+      // --- CEK JAWABAN GAME ---
       if (global.gameSessions && global.gameSessions[jid]) {
         const session = global.gameSessions[jid];
         // Jika jawaban benar
@@ -165,13 +170,21 @@ export async function messageHandler(sock, msg) {
           await sock.sendMessage(jid, { 
             text: `🎉 *BENAR!*\n\nJawaban: *${session.jawaban}*\nSelamat ${senderName}! 👏${session.deskripsi ? `\n_Alasan: ${session.deskripsi}_` : ''}` 
           }, { quoted: msg });
+          return;
         }
       }
-      return; // HANYA BALAS JIKA PERINTAH VALID (Anti-Banned)
-    }
 
-    const command = body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
-    const args = body.slice(prefix.length + command.length).trim();
+      // Dukungan perintah tanpa prefix di Private Chat atau Self-Chat (Note to Self / fromMe)
+      const firstWord = body.trim().split(/ +/)[0].toLowerCase();
+      const directPlugin = plugins.find((p) => p.command.includes(firstWord));
+      if (directPlugin && (!isGroup || msg.key?.fromMe)) {
+        prefix = '.';
+        command = firstWord;
+        args = body.trim().slice(firstWord.length).trim();
+      } else {
+        return; // HANYA BALAS JIKA PERINTAH VALID (Anti-Banned)
+      }
+    }
 
     // 1. KEAMANAN ANTI-BANNED: Anti-Spam Cooldown per pengguna
     const now = Date.now();
