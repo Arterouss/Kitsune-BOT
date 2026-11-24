@@ -136,6 +136,11 @@ export async function messageHandler(sock, msg) {
       body = msg.message.extendedTextMessage.text || '';
     }
 
+    if (msgType === 'stickerMessage') {
+      const st = msg.message.stickerMessage;
+      console.log(`📦 [STICKER RECEIVED] Dari ${senderName} (${sender}): isAnimated=${st?.isAnimated}, keys=[${Object.keys(st || {}).join(', ')}]`);
+    }
+
     body = body.trim();
     if (!body) return;
 

@@ -14,9 +14,9 @@ async function downloadMedia(mediaMessage, mediaType) {
 
 export default {
   name: 'sticker',
-  command: ['s', 'sticker', 'stiker', 'wm', 'take'],
+  command: ['s', 'sticker', 'stiker', 'wm', 'take', 'cekstiker', 'inspect', 'cek'],
   category: 'sticker',
-  description: 'Konversi foto/GIF/video ke stiker WebP 1:1 dan ganti watermark',
+  description: 'Konversi foto/GIF/video ke stiker WebP 1:1, ganti watermark & inspeksi stiker',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
     // 1. Buat Stiker Baru (.s / .sticker)
     if (['s', 'sticker', 'stiker'].includes(command)) {
@@ -105,6 +105,78 @@ export default {
       } catch (err) {
         console.error('Gagal mengubah watermark:', err);
         await reply('❌ Gagal mengubah watermark stiker.');
+      }
+      return;
+    }
+
+    // 3. Inspeksi Detail Stiker (.cekstiker / .inspect)
+    if (['cekstiker', 'inspect', 'cek'].includes(command)) {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      const targetSticker = quoted?.stickerMessage || msg.message?.stickerMessage;
+
+      if (!targetSticker) {
+        return reply(`⚠️ Balas (quote) stiker yang ingin diperiksa dengan mengetik:\n*${prefix}${command}*`);
+      }
+
+      await reply('🔍 Sedang membongkar & menganalisis struktur file stiker...');
+
+      try {
+        const buffer = await downloadMedia(targetSticker, 'sticker');
+        const keys = Object.keys(targetSticker);
+        const isAnim = Boolean(targetSticker.isAnimated);
+        const sizeKb = (buffer.length / 1024).toFixed(1);
+
+        // Baca EXIF & Metadata WebP
+        let exifInfo = 'Tidak ada EXIF';
+        let pack = '-';
+        let author = '-';
+
+        try {
+          const webpmux = (await import('node-webpmux')).default;
+          const img = new webpmux.Image();
+          await img.load(buffer);
+          if (img.exif) {
+            const rawStr = img.exif.toString('utf-8');
+            const start = rawStr.indexOf('{');
+            const end = rawStr.lastIndexOf('}');
+            if (start !== -1 && end !== -1) {
+              const parsed = JSON.parse(rawStr.slice(start, end + 1));
+              pack = parsed['sticker-pack-name'] || '-';
+              author = parsed['sticker-pack-publisher'] || '-';
+              exifInfo = JSON.stringify(parsed, null, 2);
+            }
+          }
+        } catch {}
+
+        // Deteksi apakah ada audio / suara tersembunyi
+        let soundInfo = '❌ Tidak ada audio tersemat';
+        const rawJson = JSON.stringify(targetSticker);
+        if (rawJson.includes('audio') || rawJson.includes('sound') || targetSticker.audio || targetSticker.sound) {
+          soundInfo = '🔊 Terdeteksi metadata audio di dalam stiker!';
+        }
+
+        const report = `
+📊 *[HASIL ANALISIS STRUKTUR STIKER]*
+
+🎞️ *Tipe:* ${isAnim ? 'Animasi Bergerak (Animated WebP)' : 'Gambar Diam (Static WebP)'}
+📦 *Ukuran File:* ${sizeKb} KB
+🏷️ *Packname:* ${pack}
+👤 *Author:* ${author}
+🎵 *Status Audio:* ${soundInfo}
+
+⚙️ *Properti Protobuf:*
+\`${keys.join(', ')}\`
+
+📋 *Detail Metadata EXIF:*
+\`\`\`json
+${exifInfo.length > 500 ? exifInfo.slice(0, 500) + '...' : exifInfo}
+\`\`\`
+`.trim();
+
+        await reply(report);
+      } catch (err) {
+        console.error('Error saat inspect stiker:', err);
+        await reply(`❌ Gagal memeriksa stiker: ${err.message}`);
       }
       return;
     }
