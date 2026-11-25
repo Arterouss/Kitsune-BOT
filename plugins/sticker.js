@@ -176,7 +176,7 @@ export default {
         return reply(`⚠️ Balas (quote) stiker yang ingin diperiksa dengan mengetik:\n*${prefix}${command}*\n\n_(Pesan yang terdeteksi: ${quotedType})_`);
       }
 
-      await reply('🔍 Sedang membongkar & menganalisis struktur file stiker...');
+      await reply('🔍 Sedang membongkar format file, chunk biner & protobuf stiker...');
 
       try {
         const buffer = await downloadMedia(targetSticker, 'sticker');
@@ -184,7 +184,60 @@ export default {
         const isAnim = Boolean(targetSticker.isAnimated);
         const sizeKb = (buffer.length / 1024).toFixed(1);
 
-        // Baca EXIF & Metadata WebP
+        // 1. Cek Magic Bytes & Format Kontainer Asli
+        let realFormat = 'Unknown';
+        try {
+          const { fileTypeFromBuffer } = await import('file-type');
+          const ft = await fileTypeFromBuffer(buffer);
+          if (ft) realFormat = `${ft.ext.toUpperCase()} (${ft.mime})`;
+        } catch {}
+        const headerHex = buffer.subarray(0, 16).toString('hex');
+        const headerAscii = buffer.subarray(0, 16).toString('ascii').replace(/[^\x20-\x7E]/g, '.');
+
+        // 2. Analisis Struktur RIFF / WebP Chunks + Trailing Bytes
+        const chunkCounts = {};
+        const nonFrameChunks = [];
+        let trailingInfo = '0 B';
+        try {
+          if (buffer.length > 12 && buffer.toString('ascii', 0, 4) === 'RIFF') {
+            const declaredRiffEnd = 8 + buffer.readUInt32LE(4);
+            if (buffer.length > declaredRiffEnd) {
+              const tail = buffer.subarray(declaredRiffEnd, declaredRiffEnd + 16).toString('ascii').replace(/[^\x20-\x7E]/g, '.');
+              trailingInfo = `${buffer.length - declaredRiffEnd} B (${tail})`;
+            }
+            let offset = 12;
+            while (offset + 8 <= buffer.length && offset < declaredRiffEnd) {
+              const chunkId = buffer.toString('ascii', offset, offset + 4);
+              const chunkSize = buffer.readUInt32LE(offset + 4);
+              chunkCounts[chunkId] = (chunkCounts[chunkId] || 0) + 1;
+              if (chunkId !== 'ANMF') {
+                nonFrameChunks.push(`${chunkId}(${chunkSize}B)`);
+              }
+              offset += 8 + chunkSize + (chunkSize % 2);
+            }
+          }
+        } catch {}
+
+        const chunkSummary = Object.entries(chunkCounts)
+          .map(([id, cnt]) => cnt > 1 ? `${id} x${cnt}` : id)
+          .join(', ');
+
+        // 3. Cek stream audio via ffmpeg (jika ada track tersembunyi)
+        let ffmpegStreamInfo = '-';
+        try {
+          const { spawnSync } = await import('child_process');
+          const os = (await import('os')).default;
+          const fs = (await import('fs')).default;
+          const path = (await import('path')).default;
+          const tmpProbe = path.join(os.tmpdir(), `probe_${Date.now()}.bin`);
+          fs.writeFileSync(tmpProbe, buffer);
+          const res = spawnSync('ffmpeg', ['-i', tmpProbe], { encoding: 'utf-8', windowsHide: true });
+          try { fs.unlinkSync(tmpProbe); } catch {}
+          const lines = (res.stderr || '').split('\n').filter(l => l.includes('Stream #') || l.includes('Input #'));
+          if (lines.length) ffmpegStreamInfo = lines.map(l => l.trim()).join('\n');
+        } catch {}
+
+        // 4. Baca EXIF & Metadata WebP
         let exifInfo = 'Tidak ada EXIF';
         let pack = '-';
         let author = '-';
@@ -206,28 +259,45 @@ export default {
           }
         } catch {}
 
-        // Deteksi apakah ada audio / suara tersembunyi
-        let soundInfo = '❌ Tidak ada audio tersemat';
-        const rawJson = JSON.stringify(targetSticker);
-        if (rawJson.includes('audio') || rawJson.includes('sound') || targetSticker.audio || targetSticker.sound) {
-          soundInfo = '🔊 Terdeteksi metadata audio di dalam stiker!';
+        // 5. Deteksi apakah ada sinyal audio / label / contextInfo
+        let soundInfo = '❌ Tidak terdeteksi keyword audio di protobuf';
+        const rawJson = JSON.stringify({ targetSticker, quoted });
+        if (/audio|sound|music|voice|opus|Audio/i.test(rawJson) || /Audio/.test(ffmpegStreamInfo)) {
+          soundInfo = '🔊 Terdeteksi sinyal/stream audio!';
         }
 
-        const report = `
-📊 *[HASIL ANALISIS STRUKTUR STIKER]*
+        const ctxSummary = targetSticker.contextInfo ? JSON.stringify(targetSticker.contextInfo) : 'null';
+        const quotedKeys = quoted ? Object.keys(quoted).join(', ') : '-';
 
-🎞️ *Tipe:* ${isAnim ? 'Animasi Bergerak (Animated WebP)' : 'Gambar Diam (Static WebP)'}
-📦 *Ukuran File:* ${sizeKb} KB
-🏷️ *Packname:* ${pack}
-👤 *Author:* ${author}
+        const report = `
+📊 *[HASIL ANALISIS MENDALAM STIKER]*
+
+🎞️ *Tipe:* ${isAnim ? 'Animasi Bergerak' : 'Gambar Diam'} (${targetSticker.width || '?'}x${targetSticker.height || '?'})
+🧬 *Format Asli:* ${realFormat}
+🪪 *Mimetype Proto:* \`${targetSticker.mimetype || '-'}\`
+📦 *Ukuran File:* ${sizeKb} KB | *Trailing:* ${trailingInfo}
+🔤 *Magic Header:* \`${headerAscii}\` (\`${headerHex}\`)
+🏷️ *Packname:* ${pack} | *Author:* ${author}
 🎵 *Status Audio:* ${soundInfo}
 
-⚙️ *Properti Protobuf:*
-\`${keys.join(', ')}\`
+🧱 *RIFF Chunks:* \`${chunkSummary || 'Bukan RIFF/WebP'}\`
+🧩 *Non-ANMF:* \`${nonFrameChunks.join(', ') || '-'}\`
+
+🎬 *FFmpeg Probe:*
+\`\`\`
+${ffmpegStreamInfo.slice(0, 400)}
+\`\`\`
+
+⚙️ *Quoted Keys:* \`${quotedKeys}\`
+⚙️ *Protobuf Keys:* \`${keys.join(', ')}\`
+🏷️ *Extra Flags:* lottie=${Boolean(targetSticker.isLottie)}, avatar=${Boolean(targetSticker.isAvatar)}, ai=${Boolean(targetSticker.isAiSticker)}, label=${targetSticker.accessibilityLabel || '-'}
+
+🔗 *ContextInfo:*
+\`${ctxSummary.slice(0, 350)}\`
 
 📋 *Detail Metadata EXIF:*
 \`\`\`json
-${exifInfo.length > 500 ? exifInfo.slice(0, 500) + '...' : exifInfo}
+${exifInfo.length > 350 ? exifInfo.slice(0, 350) + '...' : exifInfo}
 \`\`\`
 `.trim();
 
