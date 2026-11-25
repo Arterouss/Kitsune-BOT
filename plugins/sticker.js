@@ -1,5 +1,5 @@
 // plugins/sticker.js - Plugin Pembuat Stiker & Watermark
-import { createSticker, setStickerWatermark, extractAudioFromMedia } from '../lib/sticker.js';
+import { createSticker, setStickerWatermark, extractAudioFromMedia, createSoundSticker } from '../lib/sticker.js';
 import { config } from '../config.js';
 import { downloadContentFromMessage } from '@whiskeysockets/baileys';
 
@@ -14,10 +14,49 @@ async function downloadMedia(mediaMessage, mediaType) {
 
 export default {
   name: 'sticker',
-  command: ['s', 'sticker', 'stiker', 'saudio', 's_audio', 'wm', 'take', 'cekstiker', 'ceksticker', 'inspect', 'cek'],
+  command: ['s', 'sticker', 'stiker', 'saudio', 's_audio', 'sts', 'soundsticker', 'wm', 'take', 'cekstiker', 'ceksticker', 'inspect', 'cek'],
   category: 'sticker',
-  description: 'Konversi foto/GIF/video ke stiker WebP 1:1, stiker combo audio (.saudio), ganti watermark & inspeksi stiker',
+  description: 'Konversi foto/GIF/video ke stiker WebP 1:1, Sound Sticker (.sts), combo audio (.saudio), ganti watermark & inspeksi stiker',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
+    // 0. Sound Sticker (.sts / .soundsticker) - Mode Sound Sticker Persis Bot Luno
+    if (['sts', 'soundsticker'].includes(command)) {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      let mediaMsg = null;
+      let mediaType = 'video';
+
+      if (msg.message?.videoMessage) {
+        mediaMsg = msg.message.videoMessage;
+      } else if (msg.message?.documentMessage && (msg.message.documentMessage.mimetype?.includes('video') || msg.message.documentMessage.mimetype?.includes('gif'))) {
+        mediaMsg = msg.message.documentMessage;
+        mediaType = 'document';
+      } else if (quoted?.videoMessage) {
+        mediaMsg = quoted.videoMessage;
+      } else if (quoted?.documentMessage && (quoted.documentMessage.mimetype?.includes('video') || quoted.documentMessage.mimetype?.includes('gif'))) {
+        mediaMsg = quoted.documentMessage;
+        mediaType = 'document';
+      }
+
+      if (!mediaMsg) {
+        return reply(`⚠️ Balas (quote) video atau kirim video dengan caption:\n*${prefix}${command}*\n💡 Maksimal durasi 10 detik.`);
+      }
+
+      await reply('Making your sticker, please wait...');
+
+      try {
+        const buffer = await downloadMedia(mediaMsg, mediaType);
+        const soundStickerBuffer = await createSoundSticker(buffer, 7);
+
+        await sock.sendMessage(jid, {
+          sticker: soundStickerBuffer,
+          isAnimated: true
+        }, { quoted: msg });
+      } catch (err) {
+        console.error('Gagal membuat sound sticker .sts:', err);
+        await reply(`❌ Gagal membuat sound sticker: ${err.message}`);
+      }
+      return;
+    }
+
     // 1. Buat Stiker Baru (.s / .sticker / .saudio)
     if (['s', 'sticker', 'stiker', 'saudio', 's_audio'].includes(command)) {
       const wantAudio = ['saudio', 's_audio'].includes(command) || /audio|suara|lagu|musik/i.test(args);
