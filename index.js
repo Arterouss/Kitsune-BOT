@@ -1,5 +1,5 @@
 // index.js - Titik Masuk dan Pengelola Koneksi Bot WhatsApp Baileys
-import { makeWASocket, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import { makeWASocket, DisconnectReason, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import readline from 'readline';
@@ -110,9 +110,21 @@ async function startBot() {
   console.log('====================================================');
 
   // 1. Inisialisasi Sesi Hybrid Auth (MongoDB Atlas + Lokal)
-  const { state, saveCreds, isMongoAuth } = await useHybridAuthState('./session');
+  const { state, saveCreds, flushSaves, isMongoAuth } = await useHybridAuthState('./session');
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`ℹ️ Menggunakan Baileys versi v${version.join('.')} (Latest: ${isLatest})`);
+
+  let phoneNumber = '';
+  if (config.usePairingCode && !state.creds.registered && !state.creds.account) {
+    phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
+    if (!phoneNumber) {
+      console.log('\n[LOGIN PAIRING CODE]');
+      console.log('Masukkan nomor WhatsApp Anda yang ingin dijadikan bot.');
+      console.log('Format: gunakan kode negara tanpa spasi atau tanda + (Contoh: 6281234567890)');
+      phoneNumber = await question('👉 Masukkan Nomor WhatsApp: ');
+    }
+    phoneNumber = (phoneNumber || '').replace(/[^0-9]/g, '');
+  }
 
   // 2. Setup Socket Baileys
   const sock = makeWASocket({
@@ -120,73 +132,57 @@ async function startBot() {
     logger: pino({ level: 'silent' }), // Log hening agar terminal bersih dan rapi
     printQRInTerminal: !config.usePairingCode,
     auth: state,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    browser: Browsers.ubuntu('Chrome'),
+    qrTimeout: 180_000,
+    connectTimeoutMs: 60_000,
     generateHighQualityLinkPreview: true,
     syncFullHistory: false,
     getMessage: async () => undefined
   });
   currentSock = sock;
 
-  // 3. Login Menggunakan Pairing Code (Jika diaktifkan & belum login)
-  if (config.usePairingCode && !sock.authState.creds.registered) {
-    let phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
+  let pairingRequested = false;
 
-    if (!phoneNumber) {
-      console.log('\n[LOGIN PAIRING CODE]');
-      console.log('Masukkan nomor WhatsApp Anda yang ingin dijadikan bot.');
-      console.log('Format: gunakan kode negara tanpa spasi atau tanda + (Contoh: 6281234567890)');
-      phoneNumber = await question('👉 Masukkan Nomor WhatsApp: ');
-    }
-
-    phoneNumber = (phoneNumber || '').replace(/[^0-9]/g, '');
-
-    const requestPairing = async (retry = 0) => {
-      try {
-        await new Promise(r => setTimeout(r, 4000));
-        if (sock !== currentSock || sock.authState.creds.registered) return;
-        console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
-        const code = await sock.requestPairingCode(phoneNumber);
-        if (sock !== currentSock) return;
-        const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-        console.log('\n┌──────────────────────────────────────────────┐');
-        console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
-        console.log('└──────────────────────────────────────────────┘');
-        console.log('Cara menghubungkan:');
-        console.log('1. Buka aplikasi WhatsApp di HP Anda');
-        console.log('2. Buka menu titik tiga (⋮) > Perangkat Tertaut');
-        console.log('3. Klik "Tautkan Perangkat"');
-        console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
-        console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
-      } catch (err) {
-        if (sock !== currentSock) return;
-        if (retry < 5) {
-          console.log(`⏳ Menunggu socket WhatsApp siap (${err.message}). Mencoba lagi dalam 4 detik...`);
-          setTimeout(() => requestPairing(retry + 1), 4000);
-        } else {
-          console.error('❌ Gagal mendapatkan kode pairing:', err.message);
-        }
-      }
-    };
-
-    requestPairing();
-  }
-
-  // 4. Pantau Status Koneksi
+  // 3. Pantau Status Koneksi & Request Pairing Code saat Socket Benar-Benar Siap (Event QR)
   sock.ev.on('connection.update', async (update) => {
     if (sock !== currentSock) return;
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr && !config.usePairingCode) {
-      console.log('Silakan scan QR code di bawah menggunakan WhatsApp di HP:');
-      qrcode.generate(qr, { small: true });
+    if (qr) {
+      if (!config.usePairingCode) {
+        console.log('Silakan scan QR code di bawah menggunakan WhatsApp di HP:');
+        qrcode.generate(qr, { small: true });
+      } else if (!sock.authState.creds.registered && !pairingRequested && phoneNumber) {
+        pairingRequested = true;
+        try {
+          console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
+          const code = await sock.requestPairingCode(phoneNumber);
+          if (sock !== currentSock) return;
+          const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+          console.log('\n┌──────────────────────────────────────────────┐');
+          console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
+          console.log('└──────────────────────────────────────────────┘');
+          console.log('Cara menghubungkan:');
+          console.log('1. Buka aplikasi WhatsApp di HP Anda');
+          console.log('2. Buka menu titik tiga (⋮) > Perangkat Tertaut');
+          console.log('3. Klik "Tautkan Perangkat"');
+          console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
+          console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
+        } catch (err) {
+          pairingRequested = false;
+          console.error('❌ Gagal mendapatkan kode pairing:', err.message);
+        }
+      }
     }
 
     if (connection === 'close') {
+      try { await flushSaves(); } catch {}
+
       const statusCode = (lastDisconnect?.error instanceof Boom)
         ? lastDisconnect.error.output.statusCode
         : null;
-      
-      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === DisconnectReason.badSession;
       console.log(`⚠️ Koneksi terputus (Alasan: ${lastDisconnect?.error?.message || statusCode}). Reconnect: ${!isLoggedOut}`);
 
       if (isLoggedOut) {
@@ -197,12 +193,19 @@ async function startBot() {
           console.log('🔄 Memulai ulang bot untuk meminta kode pairing baru...');
           startBot();
         }, 3000);
+      } else if (statusCode === DisconnectReason.connectionReplaced) {
+        console.log('⚠️ Koneksi digantikan oleh sesi lain (ada bot lain aktif di nomor ini). Menunggu 15 detik sebelum menyambung ulang...');
+        setTimeout(() => startBot(), 15000);
       } else {
+        const delayMs = statusCode === DisconnectReason.restartRequired ? 1000 : 3000;
         console.log('🔄 Menyambungkan ulang ke server WhatsApp...');
-        setTimeout(() => startBot(), 3000);
+        setTimeout(() => startBot(), delayMs);
       }
     } else if (connection === 'open') {
-      try { await saveCreds(); } catch {}
+      try {
+        await saveCreds();
+        await flushSaves();
+      } catch {}
       console.log('\n====================================================');
       console.log(`✅ BERHASIL TERHUBUNG! ${config.botName} siap digunakan.`);
       console.log(`📱 Coba kirim pesan ".menu" ke nomor bot.`);
