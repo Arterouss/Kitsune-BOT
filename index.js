@@ -1,13 +1,15 @@
 // index.js - Titik Masuk dan Pengelola Koneksi Bot WhatsApp Baileys
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import { makeWASocket, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import readline from 'readline';
 import qrcode from 'qrcode-terminal';
+import axios from 'axios';
 import { config } from './config.js';
 import { messageHandler, isBotActiveNow } from './handler.js';
 import { initMongo } from './lib/rpg.js';
 import { syncAiConfigFromMongo } from './lib/ai.js';
+import { useHybridAuthState, clearAuthSession } from './lib/mongoAuth.js';
 
 import http from 'http';
 import fs from 'fs';
@@ -17,31 +19,6 @@ import path from 'path';
 initMongo().then(() => {
   syncAiConfigFromMongo().catch(() => {});
 }).catch(() => {});
-
-// Flag untuk menandai jika sesi lama di-logout sehingga tidak memulihkan sesi mati
-let sessionInvalidated = false;
-
-// Pulihkan sesi WhatsApp dari Environment Variable jika tersedia di Cloud (Render)
-function restoreSession() {
-  if (sessionInvalidated) return;
-  if (process.env.SESSION_DATA) {
-    try {
-      const sessionDir = path.resolve('./session');
-      if (!fs.existsSync(sessionDir)) {
-        fs.mkdirSync(sessionDir, { recursive: true });
-      }
-      const credsPath = path.join(sessionDir, 'creds.json');
-      if (!fs.existsSync(credsPath)) {
-        const decoded = Buffer.from(process.env.SESSION_DATA, 'base64').toString('utf-8');
-        fs.writeFileSync(credsPath, decoded);
-        console.log('🔑 [SESSION RESTORED] Berhasil memulihkan sesi login WhatsApp dari Environment Variable!');
-      }
-    } catch (err) {
-      console.error('Error saat memulihkan session dari SESSION_DATA:', err.message);
-    }
-  }
-}
-restoreSession();
 
 // Pulihkan YouTube Cookies dari Environment Variable jika tersedia di Cloud (Render)
 if (process.env.YOUTUBE_COOKIES || process.env.COOKIES_DATA) {
@@ -107,6 +84,13 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`🌐 Server Web Health Check aktif di port ${PORT}`);
+  const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL;
+  if (keepAliveUrl) {
+    setInterval(() => {
+      axios.get(keepAliveUrl).catch(() => {});
+    }, 10 * 60 * 1000);
+    console.log(`🔄 Keep-Alive Auto-Ping aktif ke ${keepAliveUrl}`);
+  }
 });
 
 /**
@@ -125,8 +109,8 @@ async function startBot() {
   console.log(`🚀 Menjalankan ${config.botName}...`);
   console.log('====================================================');
 
-  // 1. Inisialisasi Sesi Multi-File Auth
-  const { state, saveCreds } = await useMultiFileAuthState('./session');
+  // 1. Inisialisasi Sesi Hybrid Auth (MongoDB Atlas + Lokal)
+  const { state, saveCreds, isMongoAuth } = await useHybridAuthState('./session');
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`ℹ️ Menggunakan Baileys versi v${version.join('.')} (Latest: ${isLatest})`);
 
@@ -159,9 +143,10 @@ async function startBot() {
     const requestPairing = async (retry = 0) => {
       try {
         await new Promise(r => setTimeout(r, 4000));
-        if (sock.authState.creds.registered) return;
+        if (sock !== currentSock || sock.authState.creds.registered) return;
         console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
         const code = await sock.requestPairingCode(phoneNumber);
+        if (sock !== currentSock) return;
         const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
         console.log('\n┌──────────────────────────────────────────────┐');
         console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
@@ -173,6 +158,7 @@ async function startBot() {
         console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
         console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
       } catch (err) {
+        if (sock !== currentSock) return;
         if (retry < 5) {
           console.log(`⏳ Menunggu socket WhatsApp siap (${err.message}). Mencoba lagi dalam 4 detik...`);
           setTimeout(() => requestPairing(retry + 1), 4000);
@@ -186,7 +172,8 @@ async function startBot() {
   }
 
   // 4. Pantau Status Koneksi
-  sock.ev.on('connection.update', (update) => {
+  sock.ev.on('connection.update', async (update) => {
+    if (sock !== currentSock) return;
     const { connection, lastDisconnect, qr } = update;
 
     if (qr && !config.usePairingCode) {
@@ -205,10 +192,7 @@ async function startBot() {
       if (isLoggedOut) {
         console.log('❌ Sesi WhatsApp telah kedaluwarsa atau di-logout dari HP.');
         console.log('🧹 Menghapus sesi lama dan membuat kode pairing baru...');
-        try {
-          fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
-        } catch {}
-        sessionInvalidated = true;
+        await clearAuthSession('./session');
         setTimeout(() => {
           console.log('🔄 Memulai ulang bot untuk meminta kode pairing baru...');
           startBot();
@@ -218,18 +202,21 @@ async function startBot() {
         setTimeout(() => startBot(), 3000);
       }
     } else if (connection === 'open') {
+      try { await saveCreds(); } catch {}
       console.log('\n====================================================');
       console.log(`✅ BERHASIL TERHUBUNG! ${config.botName} siap digunakan.`);
       console.log(`📱 Coba kirim pesan ".menu" ke nomor bot.`);
+      if (isMongoAuth) {
+        console.log('☁️ [MONGO AUTH] Sesi WhatsApp tersimpan permanen di MongoDB Atlas (Tidak perlu pairing ulang saat deploy/restart!).');
+      }
       console.log('====================================================\n');
 
-      // Tampilkan base64 creds untuk memudahkan update SESSION_DATA di Render
+      // Tampilkan base64 creds sebagai backup manual SESSION_DATA
       try {
         const credsPath = path.resolve('./session/creds.json');
         if (fs.existsSync(credsPath)) {
           const credsBase64 = Buffer.from(fs.readFileSync(credsPath)).toString('base64');
-          console.log('🔑 [KODE SESSION_DATA BARU UNTUK RENDER]:');
-          console.log('Simpan kode di bawah ini ke Environment Variable SESSION_DATA di Render agar sesi permanen:');
+          console.log('🔑 [BACKUP SESSION_DATA]:');
           console.log('----------------------------------------------------');
           console.log(credsBase64);
           console.log('----------------------------------------------------\n');
