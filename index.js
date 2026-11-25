@@ -1,5 +1,5 @@
 // index.js - Titik Masuk dan Pengelola Koneksi Bot WhatsApp Baileys
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestWaWebVersion, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import readline from 'readline';
@@ -137,8 +137,13 @@ async function startBot() {
   }
 
   const { state, saveCreds } = await useMultiFileAuthState('./session');
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(`ℹ️ Menggunakan Baileys versi v${version.join('.')} (Latest: ${isLatest})`);
+  let version, isLatest;
+  try {
+    ({ version, isLatest } = await fetchLatestWaWebVersion({}));
+  } catch {
+    ({ version, isLatest } = await fetchLatestBaileysVersion());
+  }
+  console.log(`ℹ️ Menggunakan WA Web versi v${version.join('.')} (Latest: ${isLatest})`);
 
   // 2. Setup Socket Baileys
   const sock = makeWASocket({
@@ -146,7 +151,7 @@ async function startBot() {
     logger: pino({ level: 'silent' }), // Log hening agar terminal bersih dan rapi
     printQRInTerminal: !config.usePairingCode,
     auth: state,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    browser: Browsers.ubuntu('Chrome'),
     qrTimeout: 180_000,
     generateHighQualityLinkPreview: true,
     syncFullHistory: false,
@@ -155,7 +160,7 @@ async function startBot() {
   currentSock = sock;
 
   // 3. Login Menggunakan Pairing Code (Jika diaktifkan & belum login)
-  if (config.usePairingCode && !sock.authState.creds.registered) {
+  if (config.usePairingCode && !sock.authState.creds.registered && !sock.authState.creds.account) {
     let phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
 
     if (!phoneNumber) {
@@ -170,7 +175,7 @@ async function startBot() {
     const requestPairing = async (retry = 0) => {
       try {
         await new Promise(r => setTimeout(r, 4000));
-        if (sock !== currentSock || sock.authState.creds.registered) return;
+        if (sock !== currentSock || sock.authState.creds.registered || sock.authState.creds.account) return;
         console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
         const code = await sock.requestPairingCode(phoneNumber);
         if (sock !== currentSock) return;
