@@ -1,5 +1,5 @@
 // plugins/sticker.js - Plugin Pembuat Stiker & Watermark
-import { createSticker, setStickerWatermark, extractAudioFromMedia } from '../lib/sticker.js';
+import { createSticker, setStickerWatermark, extractAudioFromMedia, getAnimatedWebpDurationMs } from '../lib/sticker.js';
 import { patchSoundStickerProto } from '../lib/soundStickerProto.js';
 import { config } from '../config.js';
 import { downloadContentFromMessage, prepareWAMessageMedia, generateWAMessageFromContent } from '@whiskeysockets/baileys';
@@ -57,10 +57,19 @@ export default {
         const modeArg = (args || '').trim().toLowerCase();
         const fitMode = ['full', 'ori', 'nocrop', 'fit'].includes(modeArg) ? 'full' : 'crop';
 
-        const [webpBuffer, audioBuffer] = await Promise.all([
-          createSticker(buffer, packname, author, { fitMode }),
-          extractAudioFromMedia(buffer, 7)
-        ]);
+        // Buat WebP animasi terlebih dahulu, lalu ukur durasi persisnya (ms) agar audio sinkron 1:1
+        const webpBuffer = await createSticker(buffer, packname, author, {
+          fitMode,
+          isSoundSticker: true
+        });
+        const webpDurationMs = getAnimatedWebpDurationMs(webpBuffer);
+        const exactDurationSec = webpDurationMs > 200
+          ? Number((webpDurationMs / 1000).toFixed(3))
+          : (mediaMsg.seconds ? Math.min(7, mediaMsg.seconds) : 5);
+
+        const audioBuffer = await extractAudioFromMedia(buffer, exactDurationSec, {
+          smoothLoopFade: true
+        });
 
         if (!audioBuffer) {
           await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: msg });
@@ -68,15 +77,18 @@ export default {
           return;
         }
 
-        const stickerPrep = await prepareWAMessageMedia(
-          { sticker: webpBuffer },
-          { upload: sock.waUploadToServer }
-        );
-        const audioPrep = await prepareWAMessageMedia(
-          { audio: audioBuffer, mimetype: 'audio/ogg; codecs=opus', ptt: false },
-          { upload: sock.waUploadToServer }
-        );
+        const [stickerPrep, audioPrep] = await Promise.all([
+          prepareWAMessageMedia(
+            { sticker: webpBuffer },
+            { upload: sock.waUploadToServer }
+          ),
+          prepareWAMessageMedia(
+            { audio: audioBuffer, mimetype: 'audio/ogg; codecs=opus', ptt: false },
+            { upload: sock.waUploadToServer }
+          )
+        ]);
 
+        audioPrep.audioMessage.seconds = Math.max(1, Math.round(exactDurationSec));
         stickerPrep.stickerMessage.isAnimated = true;
         stickerPrep.stickerMessage.width = 512;
         stickerPrep.stickerMessage.height = 512;
