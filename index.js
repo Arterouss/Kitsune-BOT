@@ -125,7 +125,17 @@ async function startBot() {
   console.log(`🚀 Menjalankan ${config.botName}...`);
   console.log('====================================================');
 
-  // 1. Inisialisasi Sesi Multi-File Auth
+  // 1. Inisialisasi Sesi Multi-File Auth (Bersihkan creds setengah jadi agar pairing tidak loop 401)
+  const sessionCredsPath = path.resolve('./session/creds.json');
+  if (fs.existsSync(sessionCredsPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(sessionCredsPath, 'utf-8'));
+      if (!parsed?.registered && !parsed?.account) {
+        fs.unlinkSync(sessionCredsPath);
+      }
+    } catch {}
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`ℹ️ Menggunakan Baileys versi v${version.join('.')} (Latest: ${isLatest})`);
@@ -137,6 +147,7 @@ async function startBot() {
     printQRInTerminal: !config.usePairingCode,
     auth: state,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    qrTimeout: 180_000,
     generateHighQualityLinkPreview: true,
     syncFullHistory: false,
     getMessage: async () => undefined
@@ -159,9 +170,10 @@ async function startBot() {
     const requestPairing = async (retry = 0) => {
       try {
         await new Promise(r => setTimeout(r, 4000));
-        if (sock.authState.creds.registered) return;
+        if (sock !== currentSock || sock.authState.creds.registered) return;
         console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
         const code = await sock.requestPairingCode(phoneNumber);
+        if (sock !== currentSock) return;
         const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
         console.log('\n┌──────────────────────────────────────────────┐');
         console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
@@ -173,6 +185,7 @@ async function startBot() {
         console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
         console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
       } catch (err) {
+        if (sock !== currentSock) return;
         if (retry < 5) {
           console.log(`⏳ Menunggu socket WhatsApp siap (${err.message}). Mencoba lagi dalam 4 detik...`);
           setTimeout(() => requestPairing(retry + 1), 4000);
@@ -187,6 +200,7 @@ async function startBot() {
 
   // 4. Pantau Status Koneksi
   sock.ev.on('connection.update', (update) => {
+    if (sock !== currentSock) return;
     const { connection, lastDisconnect, qr } = update;
 
     if (qr && !config.usePairingCode) {
@@ -218,6 +232,7 @@ async function startBot() {
         setTimeout(() => startBot(), 3000);
       }
     } else if (connection === 'open') {
+      saveCreds().catch(() => {});
       console.log('\n====================================================');
       console.log(`✅ BERHASIL TERHUBUNG! ${config.botName} siap digunakan.`);
       console.log(`📱 Coba kirim pesan ".menu" ke nomor bot.`);
@@ -238,8 +253,12 @@ async function startBot() {
     }
   });
 
-  // 5. Simpan Kredensial Sesi Otomatis
-  sock.ev.on('creds.update', saveCreds);
+  // 5. Simpan Kredensial Sesi Otomatis (hanya jika sudah berhasil pair/register)
+  sock.ev.on('creds.update', () => {
+    if (sock.authState.creds.registered || sock.authState.creds.account) {
+      saveCreds();
+    }
+  });
 
   // 6. Tangani Pesan Masuk (Upsert) - Mendukung pesan masuk (notify) dan chat mandiri (append / self-chat)
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
