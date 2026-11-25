@@ -8,6 +8,9 @@ import { config } from './config.js';
 import { messageHandler, isBotActiveNow } from './handler.js';
 import { initMongo } from './lib/rpg.js';
 import { syncAiConfigFromMongo } from './lib/ai.js';
+import { patchSoundStickerProto } from './lib/soundStickerProto.js';
+
+patchSoundStickerProto();
 
 import http from 'http';
 import fs from 'fs';

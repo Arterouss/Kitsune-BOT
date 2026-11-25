@@ -1,7 +1,10 @@
 // plugins/sticker.js - Plugin Pembuat Stiker & Watermark
-import { createSticker, setStickerWatermark, extractAudioFromMedia, createSoundSticker } from '../lib/sticker.js';
+import { createSticker, setStickerWatermark, extractAudioFromMedia } from '../lib/sticker.js';
+import { patchSoundStickerProto } from '../lib/soundStickerProto.js';
 import { config } from '../config.js';
-import { downloadContentFromMessage } from '@whiskeysockets/baileys';
+import { downloadContentFromMessage, prepareWAMessageMedia, generateWAMessageFromContent } from '@whiskeysockets/baileys';
+
+patchSoundStickerProto();
 
 async function downloadMedia(mediaMessage, mediaType) {
   const stream = await downloadContentFromMessage(mediaMessage, mediaType);
@@ -18,7 +21,7 @@ export default {
   category: 'sticker',
   description: 'Konversi foto/GIF/video ke stiker WebP 1:1, Sound Sticker (.sts), combo audio (.saudio), ganti watermark & inspeksi stiker',
   async run({ sock, jid, msg, command, args, prefix, reply }) {
-    // 0. Sound Sticker (.sts / .soundsticker)
+    // 0. Sound Sticker (.sts / .soundsticker) - Animated WebP + AudioMessage Protobuf (Field 26)
     if (['sts', 'soundsticker'].includes(command)) {
       const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       let mediaMsg = null;
@@ -40,16 +43,50 @@ export default {
         return reply(`⚠️ Balas (quote) video atau kirim video dengan caption:\n*${prefix}${command}*\n💡 Maksimal durasi 10 detik.`);
       }
 
+      if (mediaMsg.seconds > 10) {
+        return reply('⚠️ Durasi video maksimal 10 detik untuk dijadikan sound sticker!');
+      }
+
       await reply('Making your sticker, please wait...');
 
       try {
         const buffer = await downloadMedia(mediaMsg, mediaType);
-        const soundStickerBuffer = await createSoundSticker(buffer, 7);
+        const packname = config.sticker.packname;
+        const author = config.sticker.author;
 
-        await sock.sendMessage(jid, {
-          sticker: soundStickerBuffer,
-          isAnimated: true
-        }, { quoted: msg });
+        const modeArg = (args || '').trim().toLowerCase();
+        const fitMode = ['full', 'ori', 'nocrop', 'fit'].includes(modeArg) ? 'full' : 'crop';
+
+        const [webpBuffer, audioBuffer] = await Promise.all([
+          createSticker(buffer, packname, author, { fitMode }),
+          extractAudioFromMedia(buffer, 7)
+        ]);
+
+        if (!audioBuffer) {
+          await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: msg });
+          await reply('ℹ️ Video tidak memiliki track audio, dikirim sebagai stiker animasi biasa.');
+          return;
+        }
+
+        const stickerPrep = await prepareWAMessageMedia(
+          { sticker: webpBuffer },
+          { upload: sock.waUploadToServer }
+        );
+        const audioPrep = await prepareWAMessageMedia(
+          { audio: audioBuffer, mimetype: 'audio/ogg; codecs=opus', ptt: false },
+          { upload: sock.waUploadToServer }
+        );
+
+        stickerPrep.stickerMessage.isAnimated = true;
+        stickerPrep.stickerMessage.width = 512;
+        stickerPrep.stickerMessage.height = 512;
+        stickerPrep.stickerMessage.audioMessage = audioPrep.audioMessage;
+
+        const waMsg = generateWAMessageFromContent(jid, stickerPrep, {
+          userJid: sock.user?.id,
+          quoted: msg
+        });
+        await sock.relayMessage(jid, waMsg.message, { messageId: waMsg.key.id });
       } catch (err) {
         console.error('Gagal membuat sound sticker .sts:', err);
         await reply(`❌ Gagal membuat sound sticker: ${err.message}`);
@@ -168,6 +205,7 @@ export default {
       if (quoted?.ephemeralMessage?.message) quoted = quoted.ephemeralMessage.message;
       if (quoted?.viewOnceMessage?.message) quoted = quoted.viewOnceMessage.message;
       if (quoted?.viewOnceMessageV2?.message) quoted = quoted.viewOnceMessageV2.message;
+      if (quoted?.audioStickerMessage?.message) quoted = quoted.audioStickerMessage.message;
 
       const targetSticker = quoted?.stickerMessage || msg.message?.stickerMessage;
 
@@ -268,6 +306,16 @@ export default {
 
         const ctxSummary = targetSticker.contextInfo ? JSON.stringify(targetSticker.contextInfo) : 'null';
         const quotedKeys = quoted ? Object.keys(quoted).join(', ') : '-';
+        const audioMeta = targetSticker.audioMessage
+          ? `✅ Ada (${targetSticker.audioMessage.mimetype || '-'}, ${targetSticker.audioMessage.seconds || '?'}s, ptt=${Boolean(targetSticker.audioMessage.ptt)})`
+          : 'Tidak ada';
+        const unknownMeta = targetSticker._unknownFields
+          ? JSON.stringify(targetSticker._unknownFields)
+          : '-';
+
+        if (targetSticker.audioMessage) {
+          soundInfo = '🔊 Terdeteksi Sound Sticker (StickerMessage.audioMessage field 26)!';
+        }
 
         const report = `
 📊 *[HASIL ANALISIS MENDALAM STIKER]*
@@ -279,6 +327,8 @@ export default {
 🔤 *Magic Header:* \`${headerAscii}\` (\`${headerHex}\`)
 🏷️ *Packname:* ${pack} | *Author:* ${author}
 🎵 *Status Audio:* ${soundInfo}
+🎧 *AudioMessage (Field 26):* ${audioMeta}
+❓ *Unknown Proto Fields:* \`${unknownMeta}\`
 
 🧱 *RIFF Chunks:* \`${chunkSummary || 'Bukan RIFF/WebP'}\`
 🧩 *Non-ANMF:* \`${nonFrameChunks.join(', ') || '-'}\`
