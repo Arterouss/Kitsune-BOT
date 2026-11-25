@@ -1,15 +1,13 @@
 // index.js - Titik Masuk dan Pengelola Koneksi Bot WhatsApp Baileys
-import { makeWASocket, DisconnectReason, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import readline from 'readline';
 import qrcode from 'qrcode-terminal';
-import axios from 'axios';
 import { config } from './config.js';
 import { messageHandler, isBotActiveNow } from './handler.js';
 import { initMongo } from './lib/rpg.js';
 import { syncAiConfigFromMongo } from './lib/ai.js';
-import { useHybridAuthState, clearAuthSession } from './lib/mongoAuth.js';
 
 import http from 'http';
 import fs from 'fs';
@@ -19,6 +17,31 @@ import path from 'path';
 initMongo().then(() => {
   syncAiConfigFromMongo().catch(() => {});
 }).catch(() => {});
+
+// Flag untuk menandai jika sesi lama di-logout sehingga tidak memulihkan sesi mati
+let sessionInvalidated = false;
+
+// Pulihkan sesi WhatsApp dari Environment Variable jika tersedia di Cloud (Render)
+function restoreSession() {
+  if (sessionInvalidated) return;
+  if (process.env.SESSION_DATA) {
+    try {
+      const sessionDir = path.resolve('./session');
+      if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+      }
+      const credsPath = path.join(sessionDir, 'creds.json');
+      if (!fs.existsSync(credsPath)) {
+        const decoded = Buffer.from(process.env.SESSION_DATA, 'base64').toString('utf-8');
+        fs.writeFileSync(credsPath, decoded);
+        console.log('🔑 [SESSION RESTORED] Berhasil memulihkan sesi login WhatsApp dari Environment Variable!');
+      }
+    } catch (err) {
+      console.error('Error saat memulihkan session dari SESSION_DATA:', err.message);
+    }
+  }
+}
+restoreSession();
 
 // Pulihkan YouTube Cookies dari Environment Variable jika tersedia di Cloud (Render)
 if (process.env.YOUTUBE_COOKIES || process.env.COOKIES_DATA) {
@@ -84,13 +107,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`🌐 Server Web Health Check aktif di port ${PORT}`);
-  const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL;
-  if (keepAliveUrl) {
-    setInterval(() => {
-      axios.get(keepAliveUrl).catch(() => {});
-    }, 10 * 60 * 1000);
-    console.log(`🔄 Keep-Alive Auto-Ping aktif ke ${keepAliveUrl}`);
-  }
 });
 
 /**
@@ -109,22 +125,10 @@ async function startBot() {
   console.log(`🚀 Menjalankan ${config.botName}...`);
   console.log('====================================================');
 
-  // 1. Inisialisasi Sesi Hybrid Auth (MongoDB Atlas + Lokal)
-  const { state, saveCreds, flushSaves, isMongoAuth } = await useHybridAuthState('./session');
+  // 1. Inisialisasi Sesi Multi-File Auth
+  const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`ℹ️ Menggunakan Baileys versi v${version.join('.')} (Latest: ${isLatest})`);
-
-  let phoneNumber = '';
-  if (config.usePairingCode && !state.creds.registered && !state.creds.account) {
-    phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
-    if (!phoneNumber) {
-      console.log('\n[LOGIN PAIRING CODE]');
-      console.log('Masukkan nomor WhatsApp Anda yang ingin dijadikan bot.');
-      console.log('Format: gunakan kode negara tanpa spasi atau tanda + (Contoh: 6281234567890)');
-      phoneNumber = await question('👉 Masukkan Nomor WhatsApp: ');
-    }
-    phoneNumber = (phoneNumber || '').replace(/[^0-9]/g, '');
-  }
 
   // 2. Setup Socket Baileys
   const sock = makeWASocket({
@@ -132,94 +136,100 @@ async function startBot() {
     logger: pino({ level: 'silent' }), // Log hening agar terminal bersih dan rapi
     printQRInTerminal: !config.usePairingCode,
     auth: state,
-    browser: Browsers.ubuntu('Chrome'),
-    qrTimeout: 180_000,
-    connectTimeoutMs: 60_000,
+    browser: ['Ubuntu', 'Chrome', '20.0.04'],
     generateHighQualityLinkPreview: true,
     syncFullHistory: false,
     getMessage: async () => undefined
   });
   currentSock = sock;
 
-  let pairingRequested = false;
+  // 3. Login Menggunakan Pairing Code (Jika diaktifkan & belum login)
+  if (config.usePairingCode && !sock.authState.creds.registered) {
+    let phoneNumber = process.env.PHONE_NUMBER || config.phoneNumber;
 
-  // 3. Pantau Status Koneksi & Request Pairing Code saat Socket Benar-Benar Siap (Event QR)
-  sock.ev.on('connection.update', async (update) => {
-    if (sock !== currentSock) return;
-    const { connection, lastDisconnect, qr } = update;
+    if (!phoneNumber) {
+      console.log('\n[LOGIN PAIRING CODE]');
+      console.log('Masukkan nomor WhatsApp Anda yang ingin dijadikan bot.');
+      console.log('Format: gunakan kode negara tanpa spasi atau tanda + (Contoh: 6281234567890)');
+      phoneNumber = await question('👉 Masukkan Nomor WhatsApp: ');
+    }
 
-    if (qr) {
-      if (!config.usePairingCode) {
-        console.log('Silakan scan QR code di bawah menggunakan WhatsApp di HP:');
-        qrcode.generate(qr, { small: true });
-      } else if (!sock.authState.creds.registered && !pairingRequested && phoneNumber) {
-        pairingRequested = true;
-        try {
-          console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
-          const code = await sock.requestPairingCode(phoneNumber);
-          if (sock !== currentSock) return;
-          const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-          console.log('\n┌──────────────────────────────────────────────┐');
-          console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
-          console.log('└──────────────────────────────────────────────┘');
-          console.log('Cara menghubungkan:');
-          console.log('1. Buka aplikasi WhatsApp di HP Anda');
-          console.log('2. Buka menu titik tiga (⋮) > Perangkat Tertaut');
-          console.log('3. Klik "Tautkan Perangkat"');
-          console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
-          console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
-        } catch (err) {
-          pairingRequested = false;
+    phoneNumber = (phoneNumber || '').replace(/[^0-9]/g, '');
+
+    const requestPairing = async (retry = 0) => {
+      try {
+        await new Promise(r => setTimeout(r, 4000));
+        if (sock.authState.creds.registered) return;
+        console.log(`⏳ Meminta kode pairing untuk nomor ${phoneNumber}...`);
+        const code = await sock.requestPairingCode(phoneNumber);
+        const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+        console.log('\n┌──────────────────────────────────────────────┐');
+        console.log(`│   KODE PAIRING ANDA:  \x1b[32m${formattedCode}\x1b[0m       │`);
+        console.log('└──────────────────────────────────────────────┘');
+        console.log('Cara menghubungkan:');
+        console.log('1. Buka aplikasi WhatsApp di HP Anda');
+        console.log('2. Buka menu titik tiga (⋮) > Perangkat Tertaut');
+        console.log('3. Klik "Tautkan Perangkat"');
+        console.log('4. Pilih opsi "Tautkan dengan nomor telepon saja" di bagian bawah');
+        console.log(`5. Masukkan 8 digit kode di atas: ${formattedCode}\n`);
+      } catch (err) {
+        if (retry < 5) {
+          console.log(`⏳ Menunggu socket WhatsApp siap (${err.message}). Mencoba lagi dalam 4 detik...`);
+          setTimeout(() => requestPairing(retry + 1), 4000);
+        } else {
           console.error('❌ Gagal mendapatkan kode pairing:', err.message);
         }
       }
+    };
+
+    requestPairing();
+  }
+
+  // 4. Pantau Status Koneksi
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr && !config.usePairingCode) {
+      console.log('Silakan scan QR code di bawah menggunakan WhatsApp di HP:');
+      qrcode.generate(qr, { small: true });
     }
 
     if (connection === 'close') {
-      try { await flushSaves(); } catch {}
-
       const statusCode = (lastDisconnect?.error instanceof Boom)
         ? lastDisconnect.error.output.statusCode
         : null;
-
-      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === DisconnectReason.badSession;
+      
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
       console.log(`⚠️ Koneksi terputus (Alasan: ${lastDisconnect?.error?.message || statusCode}). Reconnect: ${!isLoggedOut}`);
 
       if (isLoggedOut) {
         console.log('❌ Sesi WhatsApp telah kedaluwarsa atau di-logout dari HP.');
         console.log('🧹 Menghapus sesi lama dan membuat kode pairing baru...');
-        await clearAuthSession('./session');
+        try {
+          fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
+        } catch {}
+        sessionInvalidated = true;
         setTimeout(() => {
           console.log('🔄 Memulai ulang bot untuk meminta kode pairing baru...');
           startBot();
         }, 3000);
-      } else if (statusCode === DisconnectReason.connectionReplaced) {
-        console.log('⚠️ Koneksi digantikan oleh sesi lain (ada bot lain aktif di nomor ini). Menunggu 15 detik sebelum menyambung ulang...');
-        setTimeout(() => startBot(), 15000);
       } else {
-        const delayMs = statusCode === DisconnectReason.restartRequired ? 1000 : 3000;
         console.log('🔄 Menyambungkan ulang ke server WhatsApp...');
-        setTimeout(() => startBot(), delayMs);
+        setTimeout(() => startBot(), 3000);
       }
     } else if (connection === 'open') {
-      try {
-        await saveCreds();
-        await flushSaves();
-      } catch {}
       console.log('\n====================================================');
       console.log(`✅ BERHASIL TERHUBUNG! ${config.botName} siap digunakan.`);
       console.log(`📱 Coba kirim pesan ".menu" ke nomor bot.`);
-      if (isMongoAuth) {
-        console.log('☁️ [MONGO AUTH] Sesi WhatsApp tersimpan permanen di MongoDB Atlas (Tidak perlu pairing ulang saat deploy/restart!).');
-      }
       console.log('====================================================\n');
 
-      // Tampilkan base64 creds sebagai backup manual SESSION_DATA
+      // Tampilkan base64 creds untuk memudahkan update SESSION_DATA di Render
       try {
         const credsPath = path.resolve('./session/creds.json');
         if (fs.existsSync(credsPath)) {
           const credsBase64 = Buffer.from(fs.readFileSync(credsPath)).toString('base64');
-          console.log('🔑 [BACKUP SESSION_DATA]:');
+          console.log('🔑 [KODE SESSION_DATA BARU UNTUK RENDER]:');
+          console.log('Simpan kode di bawah ini ke Environment Variable SESSION_DATA di Render agar sesi permanen:');
           console.log('----------------------------------------------------');
           console.log(credsBase64);
           console.log('----------------------------------------------------\n');
