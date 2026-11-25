@@ -205,7 +205,19 @@ export default {
           console.error('Gagal menulis dump:', e);
         }
 
-        // 2. Analisis Chunk WebP (RIFF structure)
+        // 2. Deteksi Format Kontainer Asli (Magic Bytes) & Chunk WebP (RIFF structure)
+        let realFormat = 'Unknown';
+        try {
+          const { fileTypeFromBuffer } = await import('file-type');
+          const ft = await fileTypeFromBuffer(buffer);
+          if (ft) realFormat = `${ft.ext.toUpperCase()} (${ft.mime})`;
+        } catch {}
+        if (realFormat === 'Unknown' && buffer.length >= 12) {
+          const headerHex = buffer.subarray(0, 12).toString('hex');
+          const headerAscii = buffer.subarray(0, 12).toString('ascii').replace(/[^\x20-\x7E]/g, '.');
+          realFormat = `${headerAscii} [hex: ${headerHex}]`;
+        }
+
         const riffChunks = [];
         try {
           if (buffer.length > 12 && buffer.toString('ascii', 0, 4) === 'RIFF') {
@@ -251,10 +263,13 @@ export default {
           soundInfo = '🔊 Terdeteksi sinyal/metadata audio/label khusus!';
         }
 
+        const ctxInfo = targetSticker.contextInfo ? JSON.stringify(targetSticker.contextInfo) : 'Tidak ada';
+
         const report = `
 📊 *[HASIL ANALISIS STRUKTUR STIKER]*
 
-🎞️ *Tipe:* ${isAnim ? 'Animasi Bergerak (Animated WebP)' : 'Gambar Diam (Static WebP)'}
+🎞️ *Tipe:* ${isAnim ? 'Animasi Bergerak' : 'Gambar Diam'}
+🧬 *Format Asli:* ${realFormat}
 📦 *Ukuran File:* ${sizeKb} KB
 🏷️ *Packname:* ${pack}
 👤 *Author:* ${author}
@@ -265,6 +280,9 @@ export default {
 
 ⚙️ *Properti Protobuf:*
 \`${keys.join(', ')}\`
+
+🔗 *ContextInfo:*
+\`${ctxInfo.length > 300 ? ctxInfo.slice(0, 300) + '...' : ctxInfo}\`
 
 📋 *Detail Metadata EXIF:*
 \`\`\`json
